@@ -7,6 +7,7 @@ type User struct {
 	Phone       string
 	Designation string
 	Role        string
+	ProfileURL  string
 }
 
 type SaveProfileRequest struct {
@@ -16,6 +17,7 @@ type SaveProfileRequest struct {
         Name        string `json:"name"`
         Phone       string `json:"phone"`
         Designation string `json:"designation"`
+        ProfileURL  string `json:"profile_url"`
     } `json:"profile"`
     Company struct {
         CompanyID string `json:"company_id"`
@@ -27,6 +29,11 @@ type SaveProfileRequest struct {
             Name    string `json:"name"`
             Address string `json:"address"`
         } `json:"outlets"`
+        Labels    []struct {
+            LabelID string `json:"label_id"`
+            Name    string `json:"name"`
+            URL     string `json:"url"`
+        } `json:"labels"`
     } `json:"company"`
 }
 
@@ -38,6 +45,7 @@ type SaveProfileResponse struct {
         Phone       string `json:"phone"`
         Designation string `json:"designation"`
         Role        string `json:"role"`
+        ProfileURL  string `json:"profile_url"`
     } `json:"user"`
     Company struct {
         CompanyID string `json:"company_id"`
@@ -50,6 +58,11 @@ type SaveProfileResponse struct {
             Address string `json:"address"`
         } `json:"outlets"`
     } `json:"company"`
+    Labels []struct {
+        LabelID string `json:"label_id"`
+        Name    string `json:"name"`
+        URL     string `json:"label_url"`
+    } `json:"labels"`
 }
 
 

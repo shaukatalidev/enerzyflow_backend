@@ -7,9 +7,9 @@ import (
 )
 
 func GetUserByEmail(email string) (*User, error) {
-    row := db.DB.QueryRow("SELECT user_id, email, name, phone, designation, role FROM users WHERE email = ?", email)
+    row := db.DB.QueryRow("SELECT user_id, email, name, phone, designation, role, profile_url FROM users WHERE email = ?", email)
     u := &User{}
-    if err := row.Scan(&u.UserID, &u.Email, &u.Name, &u.Phone, &u.Designation, &u.Role); err != nil {
+    if err := row.Scan(&u.UserID, &u.Email, &u.Name, &u.Phone, &u.Designation, &u.Role, &u.ProfileURL); err != nil {
         if err == sql.ErrNoRows {
             return nil, nil
         }
@@ -19,9 +19,9 @@ func GetUserByEmail(email string) (*User, error) {
 }
 
 func GetUserByID(userID string) (*User, error) {
-    row := db.DB.QueryRow("SELECT user_id, email, name, phone, designation, role FROM users WHERE user_id = ?", userID)
+    row := db.DB.QueryRow("SELECT user_id, email, name, phone, designation, role, profile_url FROM users WHERE user_id = ?", userID)
     u := &User{}
-    if err := row.Scan(&u.UserID, &u.Email, &u.Name, &u.Phone, &u.Designation, &u.Role); err != nil {
+    if err := row.Scan(&u.UserID, &u.Email, &u.Name, &u.Phone, &u.Designation, &u.Role, &u.ProfileURL); err != nil {
         if err == sql.ErrNoRows {
             return nil, nil
         }
@@ -47,7 +47,7 @@ func UpdateUserProfileTx(tx *sql.Tx, u *User) error {
     if u == nil || u.UserID == "" {
         return errors.New("user is nil or user_id missing")
     }
-    _, err := tx.Exec(`UPDATE users SET name = ?, phone = ?, designation = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?`, u.Name, u.Phone, u.Designation, u.UserID)
+    _, err := tx.Exec(`UPDATE users SET name = ?, phone = ?, designation = ?, profile_url = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?`, u.Name, u.Phone, u.Designation, u.ProfileURL, u.UserID)
     return err
 }
 

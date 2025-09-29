@@ -49,6 +49,7 @@ func SaveProfileService(authenticatedUserID string, req SaveProfileRequest) (*Sa
     u.Name = req.Profile.Name
     u.Phone = req.Profile.Phone
     u.Designation = req.Profile.Designation
+    u.ProfileURL = req.Profile.ProfileURL
     if err = UpdateUserProfileTx(tx, u); err != nil {
         return nil, err
     }
@@ -82,6 +83,22 @@ func SaveProfileService(authenticatedUserID string, req SaveProfileRequest) (*Sa
         return nil, err
     }
 
+    if len(req.Company.Labels) > 0 {
+        labelsToSave := make([]companies.Label, 0, len(req.Company.Labels))
+        for _, l := range req.Company.Labels {
+            id := uuid.New().String()
+            labelsToSave = append(labelsToSave, companies.Label{
+                LabelID:   id,
+                CompanyID: company.CompanyID,
+                Name:      l.Name,
+                URL:       l.URL,
+            })
+        }
+        if err = companies.ReplaceCompanyLabelsTx(tx, company.CompanyID, labelsToSave); err != nil {
+            return nil, err
+        }
+    }
+
     if err = tx.Commit(); err != nil {
         return nil, err
     }
@@ -93,6 +110,7 @@ func SaveProfileService(authenticatedUserID string, req SaveProfileRequest) (*Sa
     resp.User.Phone = u.Phone
     resp.User.Designation = u.Designation
     resp.User.Role = u.Role
+    resp.User.ProfileURL = u.ProfileURL
     resp.Company.CompanyID = company.CompanyID
     resp.Company.Name = company.Name
     resp.Company.Address = company.Address
@@ -127,6 +145,7 @@ func GetProfileService(authenticatedUserID string) (*SaveProfileResponse, error)
     resp.User.Phone = u.Phone
     resp.User.Designation = u.Designation
     resp.User.Role = u.Role
+    resp.User.ProfileURL = u.ProfileURL
 
     company, err := companies.GetCompanyByUserID(u.UserID)
     if err != nil {
@@ -137,7 +156,6 @@ func GetProfileService(authenticatedUserID string) (*SaveProfileResponse, error)
         resp.Company.Name = company.Name
         resp.Company.Address = company.Address
         resp.Company.Logo = company.Logo
-        // include outlets
         outs, err := companies.ListCompanyOutlets(company.CompanyID)
         if err != nil {
             return nil, err
@@ -148,6 +166,18 @@ func GetProfileService(authenticatedUserID string) (*SaveProfileResponse, error)
                 Name    string `json:"name"`
                 Address string `json:"address"`
             }{ID: o.ID, Name: o.Name, Address: o.Address})
+        }
+        
+        companyLabels, err := companies.GetLabelsByCompanyID(company.CompanyID)
+        if err != nil {
+            return nil, err
+        }
+        for _, l := range companyLabels {
+            resp.Labels = append(resp.Labels, struct {
+                LabelID string `json:"label_id"`
+                Name    string `json:"name"`
+                URL     string `json:"label_url"`
+            }{LabelID: l.LabelID, Name: l.Name, URL: l.URL})
         }
     }
     return resp, nil
