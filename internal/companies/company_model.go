@@ -16,3 +16,11 @@ type CompanyOutlet struct {
 }
 
 
+type Label struct {
+    LabelID   string
+    CompanyID string
+    Name      string
+    URL       string
+}
+
+

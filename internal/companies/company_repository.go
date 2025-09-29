@@ -6,7 +6,6 @@ import (
 )
 
 func UpsertCompanyTx(tx *sql.Tx, c *Company) error {
-    // Try update first
     res, err := tx.Exec(`UPDATE companies SET name = ?, address = ?, logo = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?`, c.Name, c.Address, c.Logo, c.UserID)
     if err != nil {
         return err
@@ -22,6 +21,19 @@ func UpsertCompanyTx(tx *sql.Tx, c *Company) error {
     return nil
 }
 
+
+func GetLabelByIDAndCompanyID(labelID, companyID string) (*Label, error) {
+    row := db.DB.QueryRow(`SELECT label_id, company_id, name, label_url FROM labels WHERE label_id = ? AND company_id = ?`, labelID, companyID)
+    var l Label
+    if err := row.Scan(&l.LabelID, &l.CompanyID, &l.Name, &l.URL); err != nil {
+        if err == sql.ErrNoRows {
+            return nil, nil
+        }
+        return nil, err
+    }
+    return &l, nil
+}
+
 func ReplaceCompanyOutletsTx(tx *sql.Tx, companyID string, outlets []CompanyOutlet) error {
     if _, err := tx.Exec(`DELETE FROM company_outlets WHERE company_id = ?`, companyID); err != nil {
         return err
@@ -34,7 +46,7 @@ func ReplaceCompanyOutletsTx(tx *sql.Tx, companyID string, outlets []CompanyOutl
     return nil
 }
 
-// Non-transactional helpers
+
 func GetCompanyByUserID(userID string) (*Company, error) {
     row := db.DB.QueryRow(`SELECT company_id, user_id, name, address, logo FROM companies WHERE user_id = ?`, userID)
     c := &Company{}
@@ -63,6 +75,41 @@ func ListCompanyOutlets(companyID string) ([]CompanyOutlet, error) {
         result = append(result, o)
     }
     return result, rows.Err()
+}
+
+
+func GetLabelsByCompanyID(companyID string) ([]Label, error) {
+    rows, err := db.DB.Query(`SELECT label_id, company_id, name, label_url FROM labels WHERE company_id = ? ORDER BY created_at DESC`, companyID)
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+
+    var out []Label
+    for rows.Next() {
+        var l Label
+        if err := rows.Scan(&l.LabelID, &l.CompanyID, &l.Name, &l.URL); err != nil {
+            return nil, err
+        }
+        out = append(out, l)
+    }
+    return out, rows.Err()
+}
+
+func ReplaceCompanyLabelsTx(tx *sql.Tx, companyID string, labelsToSave []Label) error {
+    if _, err := tx.Exec(`DELETE FROM labels WHERE company_id = ?`, companyID); err != nil {
+        return err
+    }
+    if len(labelsToSave) == 0 {
+        return nil
+    }
+    insertQuery := `INSERT INTO labels (label_id, company_id, name, label_url) VALUES (?, ?, ?, ?)`
+    for _, l := range labelsToSave {
+        if _, err := tx.Exec(insertQuery, l.LabelID, companyID, l.Name, l.URL); err != nil {
+            return err
+        }
+    }
+    return nil
 }
 
 
