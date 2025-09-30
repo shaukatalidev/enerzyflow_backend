@@ -32,13 +32,13 @@ func SendOTPHandler(c *gin.Context) {
 		role = "business_owner"
 	}
 
-	otp, err := SendOTP(req.Email, role)
+	_, err = SendOTP(req.Email, role)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to send OTP"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "OTP sent successfully", "otp": otp})
+	c.JSON(http.StatusOK, gin.H{"message": "OTP sent successfully"})
 }
 
 func VerifyOTPHandler(c *gin.Context) {
