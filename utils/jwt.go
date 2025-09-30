@@ -2,7 +2,6 @@ package utils
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -14,7 +13,7 @@ import (
 
 const Secretkey = "totallsecretkeylol"
 
-func GenerateTokens(email string, userid uuid.UUID, role string) (string, string, error) {
+func GenerateTokens(email string, userid uuid.UUID, role string) (string, error) {
     accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
         "Email":  email,
         "userid": userid.String(),
@@ -23,21 +22,10 @@ func GenerateTokens(email string, userid uuid.UUID, role string) (string, string
     })
     access, err := accessToken.SignedString([]byte(Secretkey))
     if err != nil {
-        return "", "", err
+        return "",  err
     }
 
-    refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-        "Email":  email,
-        "userid": userid.String(),
-        "role":   role,
-        "exp":    time.Now().Add(1680000 * time.Hour).Unix(),
-    })
-    refresh, err := refreshToken.SignedString([]byte(Secretkey))
-    if err != nil {
-        return "", "", err
-    }
-
-    return access, refresh, nil
+    return access, nil
 }
 
 func VerifyToken(token string) (error, uuid.UUID, bool, string) {
@@ -105,7 +93,6 @@ func AuthMiddleware() gin.HandlerFunc {
         err, userID, expired, _ := VerifyToken(tokenStr)
         // _ = roleId
         if err != nil {
-            fmt.Println(err);
             c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid access token"})
             return
         }

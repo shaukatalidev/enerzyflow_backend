@@ -2,8 +2,8 @@ package orders
 
 import (
 	"enerzyflow_backend/internal/companies"
-	"enerzyflow_backend/internal/db"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,17 +30,24 @@ func CreateOrderService(userID string, req CreateOrderRequest) (*OrderResponse, 
 		return nil, errors.New("label does not belong to your company")
 	}
 
-	orderID := uuid.New().String()
-	_, err = db.DB.Exec(`
-		INSERT INTO orders (order_id, company_id, label_id, variant, qty, cap_color, volume, status) 
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		orderID, company.CompanyID, req.LabelID, req.Variant, req.Qty, req.CapColor, req.Volume, "placed")
-	if err != nil {
-		return nil, err
+	order := &Order{
+		OrderID:   uuid.New().String(),
+		CompanyID: company.CompanyID,
+		LabelID:   req.LabelID,
+		Variant:   req.Variant,
+		Qty:       req.Qty,
+		CapColor:  req.CapColor,
+		Volume:    req.Volume,
+		Status:    "placed",
 	}
 
+	if err := CreateOrder(order); err != nil {
+		return nil, fmt.Errorf("failed to insert order: %w", err)
+	}
+
+
 	return &OrderResponse{
-		OrderID:   orderID,
+		OrderID:   order.OrderID,
 		CompanyID: company.CompanyID,
 		LabelURL:  label.URL,
 		Variant:   req.Variant,
@@ -132,4 +139,3 @@ func GetOrdersService(userID string, limit, offset int) (*OrderListResponse, err
 		Total:  total,
 	}, nil
 }
-

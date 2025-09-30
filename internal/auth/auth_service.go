@@ -47,7 +47,6 @@ func generateEmailOTP() string {
 
 func sendEmailWithCustomSMTP(to string, otp string) error {
 	cred := getSMTPCred()
-	fmt.Println(os.Getenv("SMTP_FROM"), os.Getenv("SMTP_PASSWORD"), os.Getenv("SMTP_HOST"), os.Getenv("SMTP_PORT"))
 	if cred.From == "" || cred.Password == "" {
         log.Fatal("SMTP credentials not set in environment")
     }

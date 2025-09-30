@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"os"
 
 	"enerzyflow_backend/internal/db"
 	"enerzyflow_backend/routes"
@@ -12,13 +13,13 @@ import (
 )
 
 func main() {
-	db.InitDB("./dev.db") 
+	
     err := godotenv.Load(".env")
 	if err != nil {
 		log.Println("Warning: .env file not found, falling back to system env")
 	}
-
-	db.Migrate() 
+	db.Connect(os.Getenv("DB_URL"))
+	// db.Migrate()
 
     r := gin.Default()
 
@@ -28,7 +29,6 @@ func main() {
     config.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With"}
     r.Use(cors.New(config))
 
-	r.Static("/uploads", "./uploads")
 
     routes.RegisterAllRoutes(r)
 

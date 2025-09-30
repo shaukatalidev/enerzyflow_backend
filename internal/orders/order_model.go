@@ -5,6 +5,7 @@ import "time"
 type Order struct {
 	OrderID   string    `json:"order_id"`
 	CompanyID string    `json:"company_id"`
+	LabelID   string    `json:"label_id"` 
 	LabelURL   string    `json:"label_url"`
 	Variant   string    `json:"variant"`
 	Qty       int       `json:"qty"`

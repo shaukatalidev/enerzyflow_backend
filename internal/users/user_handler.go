@@ -1,7 +1,6 @@
 package users
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -11,12 +10,10 @@ import (
 func SaveProfileHandler(c *gin.Context) {
     var req SaveProfileRequest
 
-    // Accept JSON directly
     if err := c.ShouldBindJSON(&req); err != nil {
         c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
         return
     }
-    fmt.Println(req)
 
     userIDVal, exists := c.Get("user_id")
     if !exists {

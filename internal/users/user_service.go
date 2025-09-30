@@ -3,8 +3,6 @@ package users
 import (
 	"database/sql"
 	"errors"
-	"fmt"
-
 	"enerzyflow_backend/internal/companies"
 	"enerzyflow_backend/internal/db"
 
@@ -139,9 +137,6 @@ func SaveProfileService(authenticatedUserID string, req SaveProfileRequest) (*Sa
 			Address string `json:"address"`
 		}{ID: o.ID, Name: o.Name, Address: o.Address})
 	}
-
-	fmt.Println(resp)
-
 	return resp, nil
 }
 

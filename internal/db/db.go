@@ -3,21 +3,24 @@ package db
 import (
     "database/sql"
     "log"
-    _ "github.com/mattn/go-sqlite3"
+
+    _ "github.com/jackc/pgx/v5/stdlib"
 )
 
 var DB *sql.DB
 
-func InitDB(dbPath string) {
+func Connect(dbURL string) {
     var err error
-    DB, err = sql.Open("sqlite3", dbPath)
+    DB, err = sql.Open("pgx", dbURL)
     if err != nil {
-        log.Fatalf("failed to open DB: %v", err)
+        log.Fatalf("failed to connect to DB: %v", err)
     }
 
-    if err = DB.Ping(); err != nil {
+    err = DB.Ping()
+    if err != nil {
         log.Fatalf("failed to ping DB: %v", err)
     }
 
-    log.Println("SQLite DB connected successfully")
+    log.Println("Connected to Neon Postgres successfully!")
 }
+
