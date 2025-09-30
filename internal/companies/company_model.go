@@ -17,10 +17,14 @@ type CompanyOutlet struct {
 
 
 type Label struct {
-    LabelID   string
-    CompanyID string
-    Name      string
-    URL       string
+    LabelID   string `json:"label_id"`
+    CompanyID string `json:"company_id"`
+    Name      string `json:"name"`
+    URL       string `json:"label_url" db:"label_url"`
 }
 
-
+type LabelResponse struct {
+    LabelID   string `json:"label_id"`
+    Name      string `json:"name"`
+    URL       string `json:"label_url"`
+}

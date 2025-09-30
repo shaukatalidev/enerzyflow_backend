@@ -1,5 +1,7 @@
 package users
 
+import "enerzyflow_backend/internal/companies"
+
 type User struct {
 	UserID      string
 	Email       string
@@ -23,18 +25,14 @@ type SaveProfileRequest struct {
         CompanyID string `json:"company_id"`
         Name      string `json:"name"`
         Address   string `json:"address"`
-        Logo      string `json:"logo"`
+        Logo      string `json:"logo_url"`
         Outlets   []struct {
             ID      string `json:"id"`
             Name    string `json:"name"`
             Address string `json:"address"`
         } `json:"outlets"`
-        Labels    []struct {
-            LabelID string `json:"label_id"`
-            Name    string `json:"name"`
-            URL     string `json:"url"`
-        } `json:"labels"`
     } `json:"company"`
+    Labels []companies.Label `json:"labels"`
 }
 
 type SaveProfileResponse struct {
@@ -58,11 +56,7 @@ type SaveProfileResponse struct {
             Address string `json:"address"`
         } `json:"outlets"`
     } `json:"company"`
-    Labels []struct {
-        LabelID string `json:"label_id"`
-        Name    string `json:"name"`
-        URL     string `json:"label_url"`
-    } `json:"labels"`
+    Labels []companies.LabelResponse `json:"labels"` 
 }
 
 
