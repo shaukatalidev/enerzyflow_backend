@@ -32,7 +32,7 @@ func main() {
 
     routes.RegisterAllRoutes(r)
 
-    if err := r.Run(":8080"); err != nil {
+    if err := r.Run(":9080"); err != nil {
         log.Fatalf("failed to start server: %v", err)
     }
 }
