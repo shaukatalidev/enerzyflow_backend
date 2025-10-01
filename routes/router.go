@@ -27,8 +27,8 @@ func RegisterAllRoutes(r *gin.Engine) {
 
 	orderGroup := r.Group("/orders", utils.AuthMiddleware())
 	{
-		orderGroup.POST("/", orders.CreateOrderHandler)
-		orderGroup.GET("/", orders.GetOrdersHandler)
+		orderGroup.POST("/create", orders.CreateOrderHandler)
+		orderGroup.GET("/get-all", orders.GetOrdersHandler)
 		orderGroup.GET("/:id", orders.GetOrderHandler)
 	}
 }
