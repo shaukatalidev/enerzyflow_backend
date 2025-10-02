@@ -93,18 +93,94 @@ func GetLabelsByCompanyID(companyID string) ([]Label, error) {
 	return out, rows.Err()
 }
 
-func ReplaceCompanyLabelsTx(tx *sql.Tx, companyID string, labelsToSave []Label) error {
-	if _, err := tx.Exec(`DELETE FROM labels WHERE company_id = $1`, companyID); err != nil {
-		return err
-	}
+func ReplaceCompanyLabelsTx(tx *sql.Tx, companyID string, labelsToSave []Label) ([]BlockedLabel, error) {
+	var blocked []BlockedLabel
+    rows, err := tx.Query(`SELECT label_id FROM labels WHERE company_id = $1`, companyID)
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+
+    existing := make(map[string]bool)
+    for rows.Next() {
+        var id string
+        if err := rows.Scan(&id); err != nil {
+            return nil, err
+        }
+        existing[id] = true
+    }
+
 	if len(labelsToSave) == 0 {
-		return nil
-	}
-	insertQuery := `INSERT INTO labels (label_id, company_id, name, label_url) VALUES ($1, $2, $3, $4)`
-	for _, l := range labelsToSave {
-		if _, err := tx.Exec(insertQuery, l.LabelID, companyID, l.Name, l.URL); err != nil {
-			return err
-		}
-	}
-	return nil
+    for oldID := range existing {
+        var count int
+        if err := tx.QueryRow(`SELECT COUNT(*) FROM orders WHERE label_id = $1`, oldID).Scan(&count); err != nil {
+            return nil, err
+        }
+        if count == 0 {
+            if _, err := tx.Exec(`DELETE FROM labels WHERE label_id = $1`, oldID); err != nil {
+                return nil, err
+            }
+        } else {
+            var name string
+            if err := tx.QueryRow(`SELECT name FROM labels WHERE label_id = $1`, oldID).Scan(&name); err != nil {
+                return nil, err
+            }
+            blocked = append(blocked, BlockedLabel{
+                LabelID: oldID,
+                Name:    name,
+            })
+        }
+    }
+    return blocked, nil
+}
+
+    incoming := make(map[string]Label)
+    for _, l := range labelsToSave {
+        incoming[l.LabelID] = l
+    }
+
+    
+    for oldID := range existing {
+        if _, found := incoming[oldID]; !found {
+            var count int
+            if err := tx.QueryRow(`SELECT COUNT(*) FROM orders WHERE label_id = $1`, oldID).Scan(&count); err != nil {
+                return nil, err
+            }
+            if count == 0 {
+                if _, err := tx.Exec(`DELETE FROM labels WHERE label_id = $1`, oldID); err != nil {
+                    return nil, err
+                }
+            } else {
+                var name string
+                if err := tx.QueryRow(`SELECT name FROM labels WHERE label_id = $1`, oldID).Scan(&name); err != nil {
+                    return nil, err
+                }
+                blocked = append(blocked, BlockedLabel{
+                    LabelID: oldID,
+                    Name:    name,
+                })
+            }
+        }
+    }
+
+    for _, l := range labelsToSave {
+        if existing[l.LabelID] {
+            if _, err := tx.Exec(
+                `UPDATE labels SET name = $1, label_url = $2 WHERE label_id = $3 AND company_id = $4`,
+                l.Name, l.URL, l.LabelID, companyID,
+            ); err != nil {
+                return blocked, err
+            }
+        } else {
+			
+            if _, err := tx.Exec(
+                `INSERT INTO labels (label_id, company_id, name, label_url) VALUES ($1, $2, $3, $4)`,
+                l.LabelID, companyID, l.Name, l.URL,
+            ); err != nil {
+                return blocked, err
+            }
+        }
+    }
+
+    return blocked, nil
 }

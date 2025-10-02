@@ -28,3 +28,8 @@ type LabelResponse struct {
     Name      string `json:"name"`
     URL       string `json:"label_url"`
 }
+
+type BlockedLabel struct {
+    LabelID string `json:"label_id"`
+    Name    string `json:"name"`
+}
