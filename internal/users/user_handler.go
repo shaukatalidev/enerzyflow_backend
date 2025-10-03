@@ -37,6 +37,8 @@ func SaveProfileHandler(c *gin.Context) {
         "message": "profile saved",
         "user":    resp.User,
         "company": resp.Company,
+        "labels":  resp.Labels,
+        "blocked_labels": resp.BlockedLabels,
     })
 }
 

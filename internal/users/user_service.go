@@ -5,7 +5,6 @@ import (
 	"errors"
 	"enerzyflow_backend/internal/companies"
 	"enerzyflow_backend/internal/db"
-
 	"github.com/google/uuid"
 )
 
@@ -25,8 +24,6 @@ func GetUserByEmailService(email string) (*User, bool, error) {
 
 func SaveProfileService(authenticatedUserID string, req SaveProfileRequest) (*SaveProfileResponse, error) {
 	resp := &SaveProfileResponse{}
-
-	
 	if authenticatedUserID == "" {
 		return nil, errors.New("missing authenticated user id")
 	}
@@ -93,7 +90,10 @@ func SaveProfileService(authenticatedUserID string, req SaveProfileRequest) (*Sa
 
 	labelsToSave := make([]companies.Label, 0, len(req.Labels))
 	for _, l := range req.Labels {
-		id := uuid.New().String()
+		id := l.LabelID
+		if id == "" {
+			id = uuid.New().String() 
+		}
 
 		label := companies.Label{
 			LabelID:   id,
@@ -103,7 +103,7 @@ func SaveProfileService(authenticatedUserID string, req SaveProfileRequest) (*Sa
 		}
 
 		labelsToSave = append(labelsToSave, label)
-		
+
 		resp.Labels = append(resp.Labels, companies.LabelResponse{
 			LabelID: id,
 			Name:    l.Name,
@@ -111,7 +111,8 @@ func SaveProfileService(authenticatedUserID string, req SaveProfileRequest) (*Sa
 		})
 	}
 
-	if err = companies.ReplaceCompanyLabelsTx(tx, company.CompanyID, labelsToSave); err != nil {
+	blocked, err := companies.ReplaceCompanyLabelsTx(tx, company.CompanyID, labelsToSave)
+	if err != nil {
 		return nil, err
 	}
 
@@ -137,6 +138,8 @@ func SaveProfileService(authenticatedUserID string, req SaveProfileRequest) (*Sa
 			Address string `json:"address"`
 		}{ID: o.ID, Name: o.Name, Address: o.Address})
 	}
+	resp.BlockedLabels = blocked
+
 	return resp, nil
 }
 
@@ -180,16 +183,16 @@ func GetProfileService(authenticatedUserID string) (*SaveProfileResponse, error)
 		}
 
 		companyLabels, err := companies.GetLabelsByCompanyID(company.CompanyID)
-if err != nil {
-    return nil, err
-}
-for _, l := range companyLabels {
-    resp.Labels = append(resp.Labels, companies.LabelResponse{
-        LabelID: l.LabelID,
-        Name:    l.Name,
-        URL:     l.URL,
-    })
-}
+		if err != nil {
+			return nil, err
+		}
+		for _, l := range companyLabels {
+			resp.Labels = append(resp.Labels, companies.LabelResponse{
+				LabelID: l.LabelID,
+				Name:    l.Name,
+				URL:     l.URL,
+			})
+		}
 	}
 	return resp, nil
 }

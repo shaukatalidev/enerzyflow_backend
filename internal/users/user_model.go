@@ -57,6 +57,7 @@ type SaveProfileResponse struct {
         } `json:"outlets"`
     } `json:"company"`
     Labels []companies.LabelResponse `json:"labels"` 
+    BlockedLabels []companies.BlockedLabel `json:"blocked_labels"`
 }
 
 
