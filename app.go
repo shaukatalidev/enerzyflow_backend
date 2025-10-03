@@ -24,11 +24,10 @@ func main() {
     r := gin.Default()
 
     config := cors.DefaultConfig()
-    config.AllowOrigins = []string{"http://localhost:3000"}
+    config.AllowOrigins = []string{"http://localhost:3000","https://www.enerzyflow.com"}
     config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
     config.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With"}
     r.Use(cors.New(config))
-
 
     routes.RegisterAllRoutes(r)
 
