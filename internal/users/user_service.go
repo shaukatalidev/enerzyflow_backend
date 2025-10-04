@@ -84,7 +84,7 @@ func SaveProfileService(authenticatedUserID string, req SaveProfileRequest) (*Sa
 			Address:   o.Address,
 		})
 	}
-	if err = companies.ReplaceCompanyOutletsTx(tx, company.CompanyID, outlets); err != nil {
+	if err = companies.SaveCompanyOutletsService(tx, company.CompanyID, outlets); err != nil {
 		return nil, err
 	}
 
@@ -111,7 +111,7 @@ func SaveProfileService(authenticatedUserID string, req SaveProfileRequest) (*Sa
 		})
 	}
 
-	blocked, err := companies.ReplaceCompanyLabelsTx(tx, company.CompanyID, labelsToSave)
+	blocked, err := companies.SaveCompanyLabelsService(tx, company.CompanyID, labelsToSave)
 	if err != nil {
 		return nil, err
 	}
