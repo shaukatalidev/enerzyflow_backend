@@ -30,6 +30,8 @@ func RegisterAllRoutes(r *gin.Engine) {
 		orderGroup.POST("/create", orders.CreateOrderHandler)
 		orderGroup.GET("/get-all", orders.GetOrdersHandler)
 		orderGroup.GET("/:id", orders.GetOrderHandler)
+		orderGroup.PUT("/:id/status", utils.RoleMiddleware("printing"), orders.UpdateOrderStatusHandler)
+		orderGroup.GET("/get-all-orders", utils.RoleMiddleware("printing"), orders.GetAllOrdersForPrinting)
 	}
 }
 

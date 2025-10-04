@@ -41,3 +41,25 @@ type OrderListResponse struct {
 	Orders []OrderResponse `json:"orders"`
 	Total  int             `json:"total"`
 }
+
+type UpdateOrderStatusRequest struct {
+    Status string `json:"status"`            
+    Reason string `json:"reason,omitempty"` 
+}
+
+type AllOrderModel struct {
+	OrderID       string    `json:"order_id" db:"order_id"`
+	CompanyID     string    `json:"company_id" db:"company_id"`
+	CompanyName   string    `json:"company_name" db:"company_name"`
+	LabelID       string    `json:"label_id" db:"label_id"`
+	LabelURL      string    `json:"label_url" db:"label_url"`
+	Variant       string    `json:"variant" db:"variant"`
+	Qty           int       `json:"qty" db:"qty"`
+	CapColor      string    `json:"cap_color" db:"cap_color"`
+	Volume        string    `json:"volume" db:"volume"`
+	Status        string    `json:"status" db:"status"`
+	DeclineReason string    `json:"decline_reason" db:"decline_reason"`
+	CreatedAt     time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at" db:"updated_at"`
+	UserName      string    `json:"user_name" db:"user_name"`
+}

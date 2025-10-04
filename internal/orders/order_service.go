@@ -139,3 +139,22 @@ func GetOrdersService(userID string, limit, offset int) (*OrderListResponse, err
 		Total:  total,
 	}, nil
 }
+
+func GetAllOrdersService(userID string, limit, offset int) ([]AllOrderModel, error) {
+	return GetAllOrders(limit, offset)
+}
+
+func UpdateOrderStatusService(userID, orderID string, req UpdateOrderStatusRequest) error {
+	fmt.Println(req.Status)
+	if req.Status == "declined" && req.Reason == "" {
+		return errors.New("reason is required when canceling order")
+	}
+
+	newStatus := req.Status
+	if req.Status == "accepted" {
+		newStatus = "printing"
+		req.Reason = ""
+	}
+
+	return UpdateOrderStatus(orderID, newStatus, req.Reason)
+}

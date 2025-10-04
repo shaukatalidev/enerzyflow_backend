@@ -101,3 +101,55 @@ func GetOrderByIDAndCompanyID(orderID, companyID string) (*Order, error) {
 	}
 	return order, nil
 }
+
+func UpdateOrderStatus(orderID, status, reason string) error {
+	_, err := db.DB.Exec(
+		`UPDATE orders SET status = $1, decline_reason = $2 WHERE order_id = $3`,
+		status, reason, orderID,
+	)
+	return err
+}
+
+func GetAllOrders(limit, offset int) ([]AllOrderModel, error) {
+	query := `
+	SELECT 
+		o.order_id,
+		o.company_id,
+		c.name AS company_name,
+		o.label_id,
+		l.label_url,
+		o.variant,
+		o.qty,
+		o.cap_color,
+		o.volume,
+		o.status,
+		COALESCE(o.decline_reason, '') AS decline_reason,
+		o.created_at,
+		o.updated_at,
+		u.name AS user_name
+	FROM orders o
+	LEFT JOIN labels l ON o.label_id = l.label_id
+	INNER JOIN companies c ON o.company_id = c.company_id
+	INNER JOIN users u ON c.user_id = u.user_id
+	ORDER BY o.created_at DESC
+	LIMIT $1 OFFSET $2
+`
+	rows, err := db.DB.Query(query, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var orders []AllOrderModel
+	for rows.Next() {
+		var o AllOrderModel
+		if err := rows.Scan(
+			&o.OrderID, &o.CompanyID, &o.CompanyName ,&o.LabelID, &o.LabelURL,&o.Variant, &o.Qty,
+			&o.CapColor, &o.Volume, &o.Status, &o.DeclineReason, &o.CreatedAt, &o.UpdatedAt, &o.UserName); err != nil {
+			return nil, err
+		}
+		orders = append(orders, o)
+	}
+
+	return orders, nil
+}

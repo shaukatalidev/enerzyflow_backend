@@ -90,7 +90,7 @@ func AuthMiddleware() gin.HandlerFunc {
 
         tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
 
-        err, userID, expired, _ := VerifyToken(tokenStr)
+        err, userID, expired, role := VerifyToken(tokenStr)
         // _ = roleId
         if err != nil {
             c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid access token"})
@@ -100,7 +100,7 @@ func AuthMiddleware() gin.HandlerFunc {
             c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Access token expired"})
             return
         }
-
+        c.Set("role", role)
         c.Set("user_id", userID)
         c.Next()
     }
@@ -119,4 +119,25 @@ func ExtractClaimsWithoutValidation(tokenStr string) (jwt.MapClaims, error) {
     return claims, nil
 }
 
+func RoleMiddleware(requiredRole string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		roleVal, exists := c.Get("role")
+		if !exists {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "role not found in context"})
+			return
+		}
 
+		role, ok := roleVal.(string)
+		if !ok || role == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid role in context"})
+			return
+		}
+
+		if role != requiredRole {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "access denied for this role"})
+			return
+		}
+
+		c.Next()
+	}
+}
