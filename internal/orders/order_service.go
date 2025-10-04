@@ -5,8 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"time"
-
 	"github.com/google/uuid"
+	"mime/multipart"
+	"github.com/cloudinary/cloudinary-go/v2"
+	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
+	"os"
+	"context"
 )
 
 func CreateOrderService(userID string, req CreateOrderRequest) (*OrderResponse, error) {
@@ -157,4 +161,43 @@ func UpdateOrderStatusService(userID, orderID string, req UpdateOrderStatusReque
 	}
 
 	return UpdateOrderStatus(orderID, newStatus, req.Reason)
+}
+
+func UploadPaymentScreenshotService(orderID string, fileHeader *multipart.FileHeader) (string, error) {
+	if fileHeader == nil {
+		return "", errors.New("file cannot be nil")
+	}
+
+	// Open file
+	file, err := fileHeader.Open()
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	// Initialize Cloudinary
+	cld, err := cloudinary.NewFromParams(
+		os.Getenv("CLOUDINARY_CLOUD_NAME"),
+		os.Getenv("CLOUDINARY_API_KEY"),
+		os.Getenv("CLOUDINARY_API_SECRET"),
+	)
+	if err != nil {
+		return "", err
+	}
+
+	// Upload
+	uploadResult, err := cld.Upload.Upload(context.Background(), file, uploader.UploadParams{
+		Folder: "orders/payment_screenshots",
+		PublicID: orderID, // optional: use orderID as public ID
+	})
+	if err != nil {
+		return "", err
+	}
+
+	// Save URL in DB
+	if err := UpdateOrderPaymentScreenshot(orderID, uploadResult.SecureURL); err != nil {
+		return "", err
+	}
+
+	return uploadResult.SecureURL, nil
 }

@@ -153,3 +153,15 @@ func GetAllOrders(limit, offset int) ([]AllOrderModel, error) {
 
 	return orders, nil
 }
+
+func UpdateOrderPaymentScreenshot(orderID, screenshotURL string) error {
+	if orderID == "" || screenshotURL == "" {
+		return errors.New("orderID and screenshotURL cannot be empty")
+	}
+
+	_, err := db.DB.Exec(
+		`INSERT INTO payment_screenshots (order_id, screenshot_url) VALUES ($1, $2)`,
+		orderID, screenshotURL,
+	)
+	return err
+}
