@@ -94,6 +94,8 @@ func GetOrderService(userID, orderID string) (*OrderResponse, error) {
 		CapColor:  order.CapColor,
 		Volume:    order.Volume,
 		Status:    order.Status,
+		PaymentUrl:order.PaymentUrl,
+		InvoiceUrl:order.InvoiceUrl,
 		CreatedAt: order.CreatedAt,
 		UpdatedAt: order.UpdatedAt,
 	}, nil
@@ -133,6 +135,8 @@ func GetOrdersService(userID string, limit, offset int) (*OrderListResponse, err
 			CapColor:  order.CapColor,
 			Volume:    order.Volume,
 			Status:    order.Status,
+			PaymentUrl: order.PaymentUrl,
+			InvoiceUrl: order.InvoiceUrl,
 			CreatedAt: order.CreatedAt,
 			UpdatedAt: order.UpdatedAt,
 		}

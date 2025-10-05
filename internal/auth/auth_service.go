@@ -8,6 +8,8 @@ import (
 	"os"
 	"sync"
 	"time"
+	"github.com/sendgrid/sendgrid-go"
+	"github.com/sendgrid/sendgrid-go/helpers/mail"
 )
 
 type OTPEntry struct {
@@ -62,6 +64,27 @@ func sendEmailWithCustomSMTP(to string, otp string) error {
 	return smtp.SendMail(cred.Host+":"+cred.Port, auth, cred.From, []string{to}, msg)
 }
 
+func sendEmailWithSendGrid(toEmail, otp string) error {
+    from := mail.NewEmail("EnerzyFlow", os.Getenv("SENDGRID_FROM"))
+    to := mail.NewEmail("", toEmail)
+    subject := "Verify Your OTP"
+    plainTextContent := fmt.Sprintf("Your OTP is: %s", otp)
+    htmlContent := fmt.Sprintf("<p>Your OTP is: <b>%s</b></p>", otp)
+
+    message := mail.NewSingleEmail(from, subject, to, plainTextContent, htmlContent)
+    client := sendgrid.NewSendClient(os.Getenv("SENDGRID_API_KEY"))
+    response, err := client.Send(message)
+    if err != nil {
+        return err
+    }
+
+    if response.StatusCode >= 400 {
+        return fmt.Errorf("sendgrid error: status %d, body: %s", response.StatusCode, response.Body)
+    }
+
+    return nil
+}
+
 func keyForOTP(email, role string) string {
 	return email + "|" + role
 }
@@ -69,7 +92,7 @@ func keyForOTP(email, role string) string {
 
 func SendOTP(email, role string) (string, error) {
 	otp := generateEmailOTP()
-	if err := sendEmailWithCustomSMTP(email, otp); err != nil {
+	if err := sendEmailWithSendGrid(email, otp); err != nil {
 		log.Printf("Failed to send email to %s: %v", email, err)
 		return "", err
 	}

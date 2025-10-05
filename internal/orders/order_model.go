@@ -12,6 +12,8 @@ type Order struct {
 	CapColor  string    `json:"cap_color"`
 	Volume    int       `json:"volume"`
 	Status    string    `json:"status"`
+	PaymentUrl    string    `json:"payment_url"`
+	InvoiceUrl    string    `json:"invoice_url"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -33,6 +35,8 @@ type OrderResponse struct {
 	CapColor  string    `json:"cap_color"`
 	Volume    int       `json:"volume"`
 	Status    string    `json:"status"`
+	PaymentUrl    string    `json:"payment_url"`
+	InvoiceUrl    string    `json:"invoice_url"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -59,6 +63,8 @@ type AllOrderModel struct {
 	Volume        string    `json:"volume" db:"volume"`
 	Status        string    `json:"status" db:"status"`
 	DeclineReason string    `json:"decline_reason" db:"decline_reason"`
+	PaymentUrl    string    `json:"payment_url"`
+	InvoiceUrl    string    `json:"invoice_url"`
 	CreatedAt     time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at" db:"updated_at"`
 	UserName      string    `json:"user_name" db:"user_name"`

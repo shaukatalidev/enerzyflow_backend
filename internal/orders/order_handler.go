@@ -1,6 +1,7 @@
 package orders
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -39,6 +40,7 @@ func CreateOrderHandler(c *gin.Context) {
 }
 
 func GetOrderHandler(c *gin.Context) {
+	fmt.Println("order id")
 	orderID := c.Param("id")
 	if orderID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "order ID is required"})

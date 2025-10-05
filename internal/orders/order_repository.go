@@ -22,14 +22,14 @@ func GetOrderByID(orderID string) (*Order, error) {
 	row := db.DB.QueryRow(`
         SELECT o.order_id, o.company_id, l.label_url AS label_url, 
                o.variant, o.qty, o.cap_color, o.volume, 
-               o.status, o.created_at, o.updated_at
+               o.status,o.payment_screenshot_url,o.invoice_url o.created_at, o.updated_at
         FROM orders o
         LEFT JOIN labels l ON o.label_id = l.label_id
         WHERE o.order_id = $1`, orderID)
 
 	order := &Order{}
 	err := row.Scan(&order.OrderID, &order.CompanyID, &order.LabelURL, &order.Variant,
-		&order.Qty, &order.CapColor, &order.Volume, &order.Status, &order.CreatedAt, &order.UpdatedAt)
+		&order.Qty, &order.CapColor, &order.Volume, &order.Status,&order.PaymentUrl,&order.InvoiceUrl, &order.CreatedAt, &order.UpdatedAt)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -44,7 +44,7 @@ func GetOrdersByCompanyID(companyID string, limit, offset int) ([]Order, error) 
 	rows, err := db.DB.Query(`
         SELECT o.order_id, o.company_id, l.label_url AS label_url, 
             o.variant, o.qty, o.cap_color, o.volume, 
-            o.status, o.created_at, o.updated_at
+            o.status,o.payment_screenshot_url,o.invoice_url,o.created_at, o.updated_at
         FROM orders o
         LEFT JOIN labels l ON o.label_id = l.label_id
         WHERE o.company_id = $1 
@@ -60,7 +60,7 @@ func GetOrdersByCompanyID(companyID string, limit, offset int) ([]Order, error) 
 	for rows.Next() {
 		var order Order
 		err := rows.Scan(&order.OrderID, &order.CompanyID, &order.LabelURL, &order.Variant,
-			&order.Qty, &order.CapColor, &order.Volume, &order.Status, &order.CreatedAt, &order.UpdatedAt)
+			&order.Qty, &order.CapColor, &order.Volume, &order.Status,&order.PaymentUrl,&order.InvoiceUrl, &order.CreatedAt, &order.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -84,14 +84,14 @@ func GetOrderByIDAndCompanyID(orderID, companyID string) (*Order, error) {
 	row := db.DB.QueryRow(`
         SELECT o.order_id, o.company_id, l.label_url AS label_url, 
                o.variant, o.qty, o.cap_color, o.volume, 
-               o.status, o.created_at, o.updated_at
+               o.status,o.payment_screenshot_url,o.invoice_url,o.created_at, o.updated_at
         FROM orders o
         LEFT JOIN labels l ON o.label_id = l.label_id
         WHERE o.order_id = $1 AND o.company_id = $2`, orderID, companyID)
 
 	order := &Order{}
 	err := row.Scan(&order.OrderID, &order.CompanyID, &order.LabelURL, &order.Variant,
-		&order.Qty, &order.CapColor, &order.Volume, &order.Status, &order.CreatedAt, &order.UpdatedAt)
+		&order.Qty, &order.CapColor, &order.Volume, &order.Status,&order.PaymentUrl,&order.InvoiceUrl, &order.CreatedAt, &order.UpdatedAt)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -123,6 +123,8 @@ func GetAllOrders(limit, offset int) ([]AllOrderModel, error) {
 		o.cap_color,
 		o.volume,
 		o.status,
+		o.payment_screenshot_url,
+		o.invoice_url,
 		COALESCE(o.decline_reason, '') AS decline_reason,
 		o.created_at,
 		o.updated_at,
@@ -131,6 +133,7 @@ func GetAllOrders(limit, offset int) ([]AllOrderModel, error) {
 	LEFT JOIN labels l ON o.label_id = l.label_id
 	INNER JOIN companies c ON o.company_id = c.company_id
 	INNER JOIN users u ON c.user_id = u.user_id
+	WHERE o.status = 'placed'
 	ORDER BY o.created_at DESC
 	LIMIT $1 OFFSET $2
 `
@@ -144,8 +147,8 @@ func GetAllOrders(limit, offset int) ([]AllOrderModel, error) {
 	for rows.Next() {
 		var o AllOrderModel
 		if err := rows.Scan(
-			&o.OrderID, &o.CompanyID, &o.CompanyName ,&o.LabelID, &o.LabelURL,&o.Variant, &o.Qty,
-			&o.CapColor, &o.Volume, &o.Status, &o.DeclineReason, &o.CreatedAt, &o.UpdatedAt, &o.UserName); err != nil {
+			&o.OrderID, &o.CompanyID, &o.CompanyName, &o.LabelID, &o.LabelURL, &o.Variant, &o.Qty,
+			&o.CapColor, &o.Volume, &o.Status,&o.PaymentUrl,&o.InvoiceUrl,&o.DeclineReason, &o.CreatedAt, &o.UpdatedAt, &o.UserName); err != nil {
 			return nil, err
 		}
 		orders = append(orders, o)
@@ -160,8 +163,12 @@ func UpdateOrderPaymentScreenshot(orderID, screenshotURL string) error {
 	}
 
 	_, err := db.DB.Exec(
-		`INSERT INTO payment_screenshots (order_id, screenshot_url) VALUES ($1, $2)`,
-		orderID, screenshotURL,
+		`UPDATE orders 
+		 SET payment_screenshot_url = $1, 
+		     status = 'payment_uploaded', 
+		     updated_at = NOW()
+		 WHERE order_id = $2`,
+		screenshotURL, orderID,
 	)
 	return err
 }
