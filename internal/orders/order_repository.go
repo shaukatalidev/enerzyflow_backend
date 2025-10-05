@@ -4,18 +4,54 @@ import (
 	"database/sql"
 	"enerzyflow_backend/internal/db"
 	"errors"
+	"fmt"
 )
 
-func CreateOrder(order *Order) error {
+func CreateOrder(order *Order, userID string) error {
 	if order.OrderID == "" || order.CompanyID == "" {
 		return errors.New("order_id and company_id are required")
 	}
 
-	_, err := db.DB.Exec(`
-    INSERT INTO orders (order_id, company_id, label_id, variant, qty, cap_color, volume, status) 
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-		order.OrderID, order.CompanyID, order.LabelID, order.Variant, order.Qty, order.CapColor, order.Volume, order.Status)
-	return err
+	tx, err := db.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	_, err = tx.Exec(`
+        INSERT INTO orders (order_id, company_id, label_id, variant, qty, cap_color, volume, created_at, updated_at) 
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+		order.OrderID,
+		order.CompanyID,
+		order.LabelID,
+		order.Variant,
+		order.Qty,
+		order.CapColor,
+		order.Volume,
+		order.CreatedAt,
+		order.UpdatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to insert order: %w", err)
+	}
+
+	_, err = tx.Exec(`
+        INSERT INTO order_status_history (order_id, status, changed_at, changed_by)
+        VALUES ($1, $2, NOW(), $3)
+    `, order.OrderID, order.Status, userID)
+	if err != nil {
+		return fmt.Errorf("failed to insert initial status history: %w", err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func GetOrdersByCompanyID(companyID string, limit, offset int) ([]OrderResponse, error) {
@@ -183,18 +219,43 @@ func GetAllOrders(limit, offset int) ([]AllOrderModel, error) {
 	return orders, nil
 }
 
-func UpdateOrderPaymentScreenshot(orderID, screenshotURL string) error {
+func UpdateOrderPaymentScreenshot(orderID, screenshotURL, userID string) error {
 	if orderID == "" || screenshotURL == "" {
 		return errors.New("orderID and screenshotURL cannot be empty")
 	}
 
-	_, err := db.DB.Exec(
-		`UPDATE orders 
-		 SET payment_screenshot_url = $1, 
-		     status = 'payment_uploaded', 
-		     updated_at = NOW()
-		 WHERE order_id = $2`,
-		screenshotURL, orderID,
-	)
-	return err
+	tx, err := db.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	_, err = tx.Exec(`
+		UPDATE orders
+		SET payment_screenshot_url = $1,
+		    status = 'payment_uploaded',
+		    updated_at = NOW()
+		WHERE order_id = $2
+	`, screenshotURL, orderID)
+	if err != nil {
+		return fmt.Errorf("failed to update order payment screenshot: %w", err)
+	}
+
+	_, err = tx.Exec(`
+		INSERT INTO order_status_history (order_id, status, changed_at, changed_by)
+		VALUES ($1, $2, NOW(), $3)
+	`, orderID, "payment_uploaded", userID)
+	if err != nil {
+		return fmt.Errorf("failed to insert into order_status_history: %w", err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+
+	return nil
 }

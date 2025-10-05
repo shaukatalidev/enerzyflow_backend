@@ -42,12 +42,14 @@ func CreateOrderService(userID string, req CreateOrderRequest) (*OrderResponse, 
 		Qty:       req.Qty,
 		CapColor:  req.CapColor,
 		Volume:    req.Volume,
-		Status:    "placed",
+		Status: "payment-pending",
 	}
 
-	if err := CreateOrder(order); err != nil {
+	if err := CreateOrder(order,userID); err != nil {
 		return nil, fmt.Errorf("failed to insert order: %w", err)
 	}
+
+	
 
 
 	return &OrderResponse{
@@ -58,7 +60,7 @@ func CreateOrderService(userID string, req CreateOrderRequest) (*OrderResponse, 
 		Qty:       req.Qty,
 		CapColor:  req.CapColor,
 		Volume:    req.Volume,
-		Status:    "placed",
+		Status:    "payment-pending",
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}, nil
@@ -172,19 +174,17 @@ func GetOrderTrackingService(orderID string) ([]OrderStatusHistory, error) {
 	return GetOrderStatusHistory(orderID)
 }
 
-func UploadPaymentScreenshotService(orderID string, fileHeader *multipart.FileHeader) (string, error) {
+func UploadPaymentScreenshotService(orderID string, fileHeader *multipart.FileHeader, userID string) (string, error) {
 	if fileHeader == nil {
 		return "", errors.New("file cannot be nil")
 	}
 
-	// Open file
 	file, err := fileHeader.Open()
 	if err != nil {
 		return "", err
 	}
 	defer file.Close()
 
-	// Initialize Cloudinary
 	cld, err := cloudinary.NewFromParams(
 		os.Getenv("CLOUDINARY_CLOUD_NAME"),
 		os.Getenv("CLOUDINARY_API_KEY"),
@@ -194,17 +194,15 @@ func UploadPaymentScreenshotService(orderID string, fileHeader *multipart.FileHe
 		return "", err
 	}
 
-	// Upload
 	uploadResult, err := cld.Upload.Upload(context.Background(), file, uploader.UploadParams{
 		Folder: "orders/payment_screenshots",
-		PublicID: orderID, // optional: use orderID as public ID
+		PublicID: orderID, 
 	})
 	if err != nil {
 		return "", err
 	}
 
-	// Save URL in DB
-	if err := UpdateOrderPaymentScreenshot(orderID, uploadResult.SecureURL); err != nil {
+	if err := UpdateOrderPaymentScreenshot(orderID, uploadResult.SecureURL, userID); err != nil {
 		return "", err
 	}
 

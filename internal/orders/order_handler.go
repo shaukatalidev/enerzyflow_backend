@@ -176,6 +176,16 @@ func UploadPaymentScreenshotHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "order_id is required"})
 		return
 	}
+	userIDVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthenticated"})
+		return
+	}
+	userID, ok := userIDVal.(uuid.UUID)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid user context"})
+		return
+	}
 
 	fileHeader, err := c.FormFile("screenshot")
 	if err != nil {
@@ -183,7 +193,7 @@ func UploadPaymentScreenshotHandler(c *gin.Context) {
 		return
 	}
 
-	url, err := UploadPaymentScreenshotService(orderID, fileHeader)
+	url, err := UploadPaymentScreenshotService(orderID, fileHeader,userID.String())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "upload failed: " + err.Error()})
 		return

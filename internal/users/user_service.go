@@ -2,9 +2,9 @@ package users
 
 import (
 	"database/sql"
-	"errors"
 	"enerzyflow_backend/internal/companies"
 	"enerzyflow_backend/internal/db"
+	"errors"
 	"github.com/google/uuid"
 )
 
@@ -45,6 +45,16 @@ func SaveProfileService(authenticatedUserID string, req SaveProfileRequest) (*Sa
 			_ = tx.Rollback()
 		}
 	}()
+
+	if req.Profile.Phone != "" {
+		existingUser, err := GetUserByPhone(req.Profile.Phone)
+		if err != nil {
+			return nil, err
+		}
+		if existingUser != nil && existingUser.UserID != authenticatedUserID {
+			return nil, errors.New("phone number already in use by another user")
+		}
+	}
 
 	u.Name = req.Profile.Name
 	u.Phone = req.Profile.Phone
@@ -92,7 +102,7 @@ func SaveProfileService(authenticatedUserID string, req SaveProfileRequest) (*Sa
 	for _, l := range req.Labels {
 		id := l.LabelID
 		if id == "" {
-			id = uuid.New().String() 
+			id = uuid.New().String()
 		}
 
 		label := companies.Label{
