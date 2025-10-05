@@ -194,3 +194,19 @@ func UploadPaymentScreenshotHandler(c *gin.Context) {
 		"url":     url,
 	})
 }
+
+func GetOrderTrackingHandler(c *gin.Context) {
+	orderID := c.Param("id")
+	if orderID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "order_id required"})
+		return
+	}
+
+	history, err := GetOrderTrackingService(orderID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"history": history})
+}

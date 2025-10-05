@@ -135,6 +135,7 @@ func GetOrdersService(userID string, limit, offset int) (*OrderListResponse, err
 			CapColor:  order.CapColor,
 			Volume:    order.Volume,
 			Status:    order.Status,
+			DeclineReason: order.DeclineReason,
 			PaymentUrl: order.PaymentUrl,
 			InvoiceUrl: order.InvoiceUrl,
 			CreatedAt: order.CreatedAt,
@@ -164,7 +165,11 @@ func UpdateOrderStatusService(userID, orderID string, req UpdateOrderStatusReque
 		req.Reason = ""
 	}
 
-	return UpdateOrderStatus(orderID, newStatus, req.Reason)
+	return UpdateOrderStatus(orderID, newStatus, userID,req.Reason)
+}
+
+func GetOrderTrackingService(orderID string) ([]OrderStatusHistory, error) {
+	return GetOrderStatusHistory(orderID)
 }
 
 func UploadPaymentScreenshotService(orderID string, fileHeader *multipart.FileHeader) (string, error) {

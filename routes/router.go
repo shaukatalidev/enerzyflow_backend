@@ -33,6 +33,7 @@ func RegisterAllRoutes(r *gin.Engine) {
 		orderGroup.POST("/:id/payment-screenshot",orders.UploadPaymentScreenshotHandler)
 		orderGroup.PUT("/:id/status", utils.RoleMiddleware("printing"), orders.UpdateOrderStatusHandler)
 		orderGroup.GET("/get-all-orders", utils.RoleMiddleware("printing"), orders.GetAllOrdersForPrinting)
+		orderGroup.GET("/:id/tracking", orders.GetOrderTrackingHandler)
 	}
 }
 

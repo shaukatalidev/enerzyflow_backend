@@ -18,29 +18,7 @@ func CreateOrder(order *Order) error {
 	return err
 }
 
-func GetOrderByID(orderID string) (*Order, error) {
-	row := db.DB.QueryRow(`
-        SELECT o.order_id, o.company_id, l.label_url AS label_url, 
-               o.variant, o.qty, o.cap_color, o.volume, 
-               o.status,o.payment_screenshot_url,o.invoice_url o.created_at, o.updated_at
-        FROM orders o
-        LEFT JOIN labels l ON o.label_id = l.label_id
-        WHERE o.order_id = $1`, orderID)
-
-	order := &Order{}
-	err := row.Scan(&order.OrderID, &order.CompanyID, &order.LabelURL, &order.Variant,
-		&order.Qty, &order.CapColor, &order.Volume, &order.Status,&order.PaymentUrl,&order.InvoiceUrl, &order.CreatedAt, &order.UpdatedAt)
-
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil
-		}
-		return nil, err
-	}
-	return order, nil
-}
-
-func GetOrdersByCompanyID(companyID string, limit, offset int) ([]Order, error) {
+func GetOrdersByCompanyID(companyID string, limit, offset int) ([]OrderResponse, error) {
 	rows, err := db.DB.Query(`
         SELECT o.order_id, o.company_id, l.label_url AS label_url, 
             o.variant, o.qty, o.cap_color, o.volume, 
@@ -56,11 +34,11 @@ func GetOrdersByCompanyID(companyID string, limit, offset int) ([]Order, error) 
 	}
 	defer rows.Close()
 
-	var orders []Order
+	var orders []OrderResponse
 	for rows.Next() {
-		var order Order
+		var order OrderResponse
 		err := rows.Scan(&order.OrderID, &order.CompanyID, &order.LabelURL, &order.Variant,
-			&order.Qty, &order.CapColor, &order.Volume, &order.Status,&order.PaymentUrl,&order.InvoiceUrl, &order.CreatedAt, &order.UpdatedAt)
+			&order.Qty, &order.CapColor, &order.Volume, &order.Status,&order.DeclineReason,&order.PaymentUrl,&order.InvoiceUrl, &order.CreatedAt, &order.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -80,18 +58,18 @@ func GetOrdersCountByCompanyID(companyID string) (int, error) {
 	return count, err
 }
 
-func GetOrderByIDAndCompanyID(orderID, companyID string) (*Order, error) {
+func GetOrderByIDAndCompanyID(orderID, companyID string) (*OrderResponse, error) {
 	row := db.DB.QueryRow(`
         SELECT o.order_id, o.company_id, l.label_url AS label_url, 
                o.variant, o.qty, o.cap_color, o.volume, 
-               o.status,o.payment_screenshot_url,o.invoice_url,o.created_at, o.updated_at
+               o.status,o.decline_reason,o.payment_screenshot_url,o.invoice_url,o.created_at, o.updated_at
         FROM orders o
         LEFT JOIN labels l ON o.label_id = l.label_id
         WHERE o.order_id = $1 AND o.company_id = $2`, orderID, companyID)
 
-	order := &Order{}
+	order := &OrderResponse{}
 	err := row.Scan(&order.OrderID, &order.CompanyID, &order.LabelURL, &order.Variant,
-		&order.Qty, &order.CapColor, &order.Volume, &order.Status,&order.PaymentUrl,&order.InvoiceUrl, &order.CreatedAt, &order.UpdatedAt)
+		&order.Qty, &order.CapColor, &order.Volume, &order.Status,&order.DeclineReason,&order.PaymentUrl,&order.InvoiceUrl, &order.CreatedAt, &order.UpdatedAt)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -102,12 +80,60 @@ func GetOrderByIDAndCompanyID(orderID, companyID string) (*Order, error) {
 	return order, nil
 }
 
-func UpdateOrderStatus(orderID, status, reason string) error {
-	_, err := db.DB.Exec(
-		`UPDATE orders SET status = $1, decline_reason = $2 WHERE order_id = $3`,
-		status, reason, orderID,
-	)
-	return err
+func UpdateOrderStatus(orderID, status, reason, changedBy string) error {
+	tx, err := db.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	// 1️⃣ Update current status in orders table
+	_, err = tx.Exec(`
+		UPDATE orders 
+		SET status = $1, updated_at = NOW() 
+		WHERE order_id = $2
+	`, status, orderID)
+	if err != nil {
+		return err
+	}
+
+	// 2️⃣ Insert into status history
+	_, err = tx.Exec(`
+		INSERT INTO order_status_history (order_id, status, changed_at, changed_by, reason)
+		VALUES ($1, $2, NOW(), $3, $4)
+	`, orderID, status, changedBy, reason)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func GetOrderStatusHistory(orderID string) ([]OrderStatusHistory, error) {
+	rows, err := db.DB.Query(`
+		SELECT status, changed_at, changed_by, reason
+		FROM order_status_history
+		WHERE order_id = $1
+		ORDER BY changed_at ASC
+	`, orderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var history []OrderStatusHistory
+	for rows.Next() {
+		var h OrderStatusHistory
+		if err := rows.Scan(&h.Status, &h.ChangedAt, &h.ChangedBy, &h.Reason); err != nil {
+			return nil, err
+		}
+		history = append(history, h)
+	}
+	return history, nil
 }
 
 func GetAllOrders(limit, offset int) ([]AllOrderModel, error) {

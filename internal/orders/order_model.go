@@ -35,6 +35,7 @@ type OrderResponse struct {
 	CapColor  string    `json:"cap_color"`
 	Volume    int       `json:"volume"`
 	Status    string    `json:"status"`
+	DeclineReason string    `json:"decline_reason"`
 	PaymentUrl    string    `json:"payment_url"`
 	InvoiceUrl    string    `json:"invoice_url"`
 	CreatedAt time.Time `json:"created_at"`
@@ -68,4 +69,11 @@ type AllOrderModel struct {
 	CreatedAt     time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at" db:"updated_at"`
 	UserName      string    `json:"user_name" db:"user_name"`
+}
+
+type OrderStatusHistory struct {
+	Status    string    `json:"status"`
+	ChangedAt time.Time `json:"changed_at"`
+	ChangedBy string    `json:"changed_by,omitempty"`
+	Reason    string    `json:"reason,omitempty"`
 }
