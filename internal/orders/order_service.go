@@ -42,7 +42,7 @@ func CreateOrderService(userID string, req CreateOrderRequest) (*OrderResponse, 
 		Qty:              req.Qty,
 		CapColor:         req.CapColor,
 		Volume:           req.Volume,
-		Status:           "payment_pending",
+		Status:           "placed",
 		ExpectedDelivery: time.Now().Add(5 * 24 * time.Hour),
 		CreatedAt:        time.Now(),
 		UpdatedAt:        time.Now(),
@@ -60,7 +60,8 @@ func CreateOrderService(userID string, req CreateOrderRequest) (*OrderResponse, 
 		Qty:              req.Qty,
 		CapColor:         req.CapColor,
 		Volume:           req.Volume,
-		Status:           "payment_pending",
+		Status:           "placed",
+		PaymentStatus:    "payment_pending",
 		ExpectedDelivery: order.ExpectedDelivery,
 		CreatedAt:        time.Now(),
 		UpdatedAt:        time.Now(),
@@ -89,6 +90,8 @@ func GetOrderService(userID, orderID string) (*OrderResponse, error) {
 		CapColor:         order.CapColor,
 		Volume:           order.Volume,
 		Status:           order.Status,
+		PaymentStatus:    order.PaymentStatus,
+		DeclineReason:    order.DeclineReason,
 		PaymentUrl:       order.PaymentUrl,
 		InvoiceUrl:       order.InvoiceUrl,
 		ExpectedDelivery: order.ExpectedDelivery,
@@ -131,6 +134,7 @@ func GetOrdersService(userID string, limit, offset int) (*OrderListResponse, err
 			CapColor:         order.CapColor,
 			Volume:           order.Volume,
 			Status:           order.Status,
+			PaymentStatus:    order.PaymentStatus,
 			DeclineReason:    order.DeclineReason,
 			PaymentUrl:       order.PaymentUrl,
 			InvoiceUrl:       order.InvoiceUrl,
@@ -147,15 +151,7 @@ func GetOrdersService(userID string, limit, offset int) (*OrderListResponse, err
 }
 
 func GetAllOrdersService(role string, limit, offset int) ([]AllOrderModel, error) {
-	switch role {
-	case "admin":
-		return GetAllOrders(limit, offset, nil)
-	case "printing":
-		status := "payment_verified"
-		return GetAllOrders(limit, offset, &status)
-	default:
-		return nil, fmt.Errorf("unauthorized role: %s", role)
-	}
+	return GetAllOrders(limit, offset, role)
 }
 
 func UpdateOrderStatusService(userID, role, orderID string, req UpdateOrderStatusRequest) error {
@@ -169,29 +165,92 @@ func UpdateOrderStatusService(userID, role, orderID string, req UpdateOrderStatu
 
 	switch role {
 	case "admin":
-		if req.Status == "declined" || req.Status == "payment_rejected" {
-			if req.Reason == "" {
-				return errors.New("reason is required for declined orders")
-			}
+		validStatuses := map[string]bool{
+			"placed":             true,
+			"printing":           true,
+			"ready_for_plant":    true,
+			"plant_processing":   true,
+			"ready_for_dispatch": true,
+			"dispatched":         true,
+			"completed":          true,
+			"declined":           true,
 		}
-	case "printing":
-		if order.Status != "placed" {
-			return errors.New("printing role can only update orders with status 'placed'")
+
+		if !validStatuses[req.Status] {
+			return fmt.Errorf("invalid status '%s' for admin", req.Status)
 		}
-		if req.Status != "accepted" && req.Status != "declined" {
-			return errors.New("printing role can only accept or decline an order")
-		}
+
 		if req.Status == "declined" && req.Reason == "" {
-			return errors.New("reason is required when declining order")
+			return errors.New("reason required when declining an order")
 		}
-		if req.Status == "accepted" {
-			req.Status = "printing"
-			req.Reason = ""
+
+		return UpdateOrderStatus(orderID, req.Status, userID, req.Reason)
+
+	case "printing":
+	if order.PaymentStatus != "payment_verified" {
+		return errors.New("printing can only handle payment-verified orders")
+	}
+
+	switch order.Status {
+	case "placed":
+		switch req.Status {
+		case "accepted":
+			return UpdateOrderStatus(orderID, "printing", userID, "")
+		case "declined":
+			if req.Reason == "" {
+				return errors.New("reason required when declining order")
+			}
+			return UpdateOrderStatus(orderID, "declined", userID, req.Reason)
+		default:
+			return errors.New("printing can only accept or decline orders")
 		}
+	case "printing": 
+		if req.Status == "ready_for_plant" {
+			return UpdateOrderStatus(orderID, "ready_for_plant", userID, "")
+		}
+		return errors.New("invalid status update from printing")
+	default:
+		return errors.New("printing cannot handle this status")
+	}
+
+	case "plant":
+	switch order.Status {
+	case "ready_for_plant":
+		return UpdateOrderStatus(orderID, "plant_processing", userID, "")
+	case "plant_processing":
+		return UpdateOrderStatus(orderID, "ready_for_dispatch", userID, "")
+	default:
+		return errors.New("plant can only handle 'ready_for_plant' or 'plant_processing' statuses")
+	}
+
 	default:
 		return errors.New("unauthorized role")
 	}
-	return UpdateOrderStatus(orderID, req.Status, userID, req.Reason)
+}
+
+func UpdatePaymentStatusService(orderID, paymentStatus, reason, adminID string) error {
+	order, err := GetOrderByID(orderID)
+	if err != nil {
+		return err
+	}
+	if order == nil {
+		return errors.New("order not found")
+	}
+
+	if order.PaymentStatus != "payment_uploaded" {
+		return errors.New("cannot update payment: payment not uploaded yet")
+	}
+
+	switch paymentStatus {
+	case "payment_verified":
+		return UpdatePaymentStatus(orderID, "payment_verified", adminID, "")
+
+	case "payment_rejected":
+		return UpdatePaymentStatus(orderID, "payment_rejected", adminID, reason)
+
+	default:
+		return errors.New("invalid payment status")
+	}
 }
 
 func GetOrderTrackingService(orderID string) ([]OrderStatusHistory, error) {
@@ -238,6 +297,18 @@ func UploadInvoiceService(orderID string, file *multipart.FileHeader) (string, e
 		return "", errors.New("no file provided")
 	}
 
+	order, err := GetOrderByID(orderID)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch order: %w", err)
+	}
+	if order == nil {
+		return "", errors.New("order not found")
+	}
+
+	if order.PaymentStatus != "payment_verified" {
+		return "", errors.New("cannot upload invoice: payment not verified yet")
+	}
+
 	cld, err := cloudinary.NewFromParams(
 		os.Getenv("CLOUDINARY_CLOUD_NAME"),
 		os.Getenv("CLOUDINARY_API_KEY"),
@@ -254,14 +325,14 @@ func UploadInvoiceService(orderID string, file *multipart.FileHeader) (string, e
 	defer src.Close()
 
 	uploadResult, err := cld.Upload.Upload(context.Background(), src, uploader.UploadParams{
-		Folder: "enerzyflow/invoices",
-		ResourceType: "raw", 
+		Folder:       "enerzyflow/invoices",
+		ResourceType: "raw",
 		PublicID:     "invoice_" + orderID,
 	})
 	if err != nil {
 		return "", err
 	}
-	
+
 	if err := UpdateOrderInvoice(orderID, uploadResult.SecureURL); err != nil {
 		return "", err
 	}

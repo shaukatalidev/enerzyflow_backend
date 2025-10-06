@@ -168,6 +168,49 @@ func UpdateOrderStatusHandler(c *gin.Context) {
 	})
 }
 
+func UpdatePaymentStatusHandler(c *gin.Context) {
+	orderID := c.Param("id")
+	if orderID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "order_id is required"})
+		return
+	}
+	var req UpdateOrderStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	if req.Status != "payment_verified" && req.Status != "payment_rejected" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payment status"})
+		return
+	}
+
+	if req.Status == "payment_rejected" && req.Reason == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "reason is required for rejected payments"})
+		return
+	}
+
+	userIDVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthenticated"})
+		return
+	}
+	userID, ok := userIDVal.(uuid.UUID)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid user context"})
+		return
+	}
+	
+	if err := UpdatePaymentStatusService(orderID, req.Status, req.Reason, userID.String()); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": fmt.Sprintf("payment status updated to '%s' successfully", req.Status),
+	})
+}
+
 func UploadPaymentScreenshotHandler(c *gin.Context) {
 	orderID := c.Param("id")
 	if orderID == "" {
