@@ -230,3 +230,39 @@ func UploadPaymentScreenshotService(orderID string, fileHeader *multipart.FileHe
 
 	return uploadResult.SecureURL, nil
 }
+
+func UploadInvoiceService(orderID string, file *multipart.FileHeader) (string, error) {
+	if file == nil {
+		return "", errors.New("no file provided")
+	}
+
+	cld, err := cloudinary.NewFromParams(
+		os.Getenv("CLOUDINARY_CLOUD_NAME"),
+		os.Getenv("CLOUDINARY_API_KEY"),
+		os.Getenv("CLOUDINARY_API_SECRET"),
+	)
+	if err != nil {
+		return "", err
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		return "", err
+	}
+	defer src.Close()
+
+	uploadResult, err := cld.Upload.Upload(context.Background(), src, uploader.UploadParams{
+		Folder: "enerzyflow/invoices",
+		ResourceType: "raw", 
+		PublicID:     "invoice_" + orderID,
+	})
+	if err != nil {
+		return "", err
+	}
+	
+	if err := UpdateOrderInvoice(orderID, uploadResult.SecureURL); err != nil {
+		return "", err
+	}
+
+	return uploadResult.SecureURL, nil
+}

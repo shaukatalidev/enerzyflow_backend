@@ -37,6 +37,7 @@ func RegisterAllRoutes(r *gin.Engine) {
 		orderGroup.PUT("/:id/status", orders.UpdateOrderStatusHandler)
 		orderGroup.GET("/get-all-orders", orders.GetAllOrdersHandler)
 		orderGroup.GET("/:id/tracking", orders.GetOrderTrackingHandler)
+		orderGroup.POST("/:id/upload-invoice", utils.RoleMiddleware("admin"),orders.UploadInvoiceHandler)
 	}
 }
 

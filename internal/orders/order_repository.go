@@ -268,3 +268,30 @@ func UpdateOrderPaymentScreenshot(orderID, screenshotURL, userID string) error {
 
 	return nil
 }
+
+func UpdateOrderInvoice(orderID, invoiceURL string) error {
+	if orderID == "" || invoiceURL == "" {
+		return errors.New("orderID and screenshotURL cannot be empty")
+	}
+
+	tx, err := db.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	_, err = tx.Exec(`UPDATE orders SET invoice_url = $1, updated_at = NOW() WHERE order_id = $2`,invoiceURL, orderID)
+	if err != nil {
+		return fmt.Errorf("failed to update order invoice: %w", err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+
+	return nil
+}
