@@ -62,3 +62,37 @@ func GetProfileHandler(c *gin.Context) {
 
     c.JSON(http.StatusOK, resp)
 }
+
+func GetAllUsersHandler(c *gin.Context) {
+	users, err := GetAllUserService()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"users": users})
+}
+
+func CreateUserByAdminHandler(c *gin.Context){
+    role := c.GetString("role")
+    if role != "admin" {
+        c.JSON(http.StatusForbidden, gin.H{"error": "access denied"})
+        return
+    }
+
+    var req CreateUserRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+    user, err := CreateUserByAdminService(req)
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+
+    c.JSON(http.StatusCreated, gin.H{
+        "message": "user created successfully",
+        "user":    user,
+    })
+}

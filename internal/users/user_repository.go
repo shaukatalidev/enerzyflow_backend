@@ -63,3 +63,25 @@ func UpdateUserProfileTx(tx *sql.Tx, u *User) error {
     return err
 }
 
+func GetAllUsers() ([]User, error) {
+	rows, err := db.DB.Query(`SELECT user_id, email, name, phone, role, profile_url FROM users`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var usersList []User
+	for rows.Next() {
+		var u User
+		if err := rows.Scan(&u.UserID, &u.Email, &u.Name, &u.Phone, &u.Role, &u.ProfileURL); err != nil {
+			return nil, err
+		}
+		usersList = append(usersList, u)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return usersList, nil
+}

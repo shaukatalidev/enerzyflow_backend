@@ -104,9 +104,11 @@ func GetOrdersHandler(c *gin.Context) {
 }
 
 
-func GetAllOrdersForPrinting(c *gin.Context) {
+func GetAllOrdersHandler(c *gin.Context) {
 	limitStr := c.DefaultQuery("limit", "10")
 	offsetStr := c.DefaultQuery("offset", "0")
+
+	role := c.GetString("role")
 
 	limit, err := strconv.Atoi(limitStr)
 	if err != nil || limit <= 0 {
@@ -118,18 +120,7 @@ func GetAllOrdersForPrinting(c *gin.Context) {
 		offset = 0
 	}
 
-	userIDVal, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthenticated"})
-		return
-	}
-	userID, ok := userIDVal.(uuid.UUID)
-	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid user context"})
-		return
-	}
-
-	orders, err := GetAllOrdersService(userID.String(), limit, offset)
+	orders, err := GetAllOrdersService(role, limit, offset)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -137,6 +128,7 @@ func GetAllOrdersForPrinting(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"orders": orders,
+		"count": len(orders),
 	})
 }
 
@@ -159,8 +151,14 @@ func UpdateOrderStatusHandler(c *gin.Context) {
 		return
 	}
 	userID, _ := userIDVal.(uuid.UUID) 
+	
+	role := c.GetString("role")
+	if role == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "user role missing in context"})
+		return
+	}
 
-	if err := UpdateOrderStatusService(userID.String(), orderID, req); err != nil {
+	if err := UpdateOrderStatusService(userID.String(),role, orderID, req); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}

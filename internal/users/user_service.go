@@ -5,6 +5,8 @@ import (
 	"enerzyflow_backend/internal/companies"
 	"enerzyflow_backend/internal/db"
 	"errors"
+	"fmt"
+
 	"github.com/google/uuid"
 )
 
@@ -46,12 +48,12 @@ func SaveProfileService(authenticatedUserID string, req SaveProfileRequest) (*Sa
 		}
 	}()
 
-	if req.Profile.Phone != "" {
-		existingUser, err := GetUserByPhone(req.Profile.Phone)
+	if req.Profile.Phone != nil && *req.Profile.Phone != "" {
+		existingUser, err := GetUserByPhone(*req.Profile.Phone)
 		if err != nil {
 			return nil, err
 		}
-		if existingUser != nil && existingUser.UserID != authenticatedUserID {
+		if existingUser != nil && existingUser.UserID != authenticatedUserID {	
 			return nil, errors.New("phone number already in use by another user")
 		}
 	}
@@ -205,4 +207,35 @@ func GetProfileService(authenticatedUserID string) (*SaveProfileResponse, error)
 		}
 	}
 	return resp, nil
+}
+
+func GetAllUserService() ([]User, error) {
+	return GetAllUsers()
+}
+
+func CreateUserByAdminService(req CreateUserRequest) (*User, error) {
+    if req.Role != "printing" && req.Role != "plant" {
+        return nil, errors.New("invalid role type")
+    }
+
+    existing, err := GetUserByEmail(req.Email)
+    if err != nil {
+        return nil, err
+    }
+    if existing != nil {
+        return nil, fmt.Errorf("user with email %s already exists", req.Email)
+    }
+
+    user := &User{
+        UserID:      uuid.New().String(),
+        Email:       req.Email,
+        Role:        req.Role,
+        ProfileURL:  "",
+    }
+
+    if err := InsertUser(user); err != nil {
+        return nil, fmt.Errorf("failed to create user: %w", err)
+    }
+
+    return user, nil
 }

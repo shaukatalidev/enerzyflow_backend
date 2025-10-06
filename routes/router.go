@@ -23,6 +23,9 @@ func RegisterAllRoutes(r *gin.Engine) {
 	{
 		userGroup.POST("/profile", users.SaveProfileHandler)
 		userGroup.GET("/profile", users.GetProfileHandler)
+		userGroup.GET("/all", utils.RoleMiddleware("admin"),users.GetAllUsersHandler)
+		userGroup.POST("/create",users.CreateUserByAdminHandler)
+		
 	}
 
 	orderGroup := r.Group("/orders", utils.AuthMiddleware())
@@ -31,8 +34,8 @@ func RegisterAllRoutes(r *gin.Engine) {
 		orderGroup.GET("/get-all", orders.GetOrdersHandler)
 		orderGroup.GET("/:id", orders.GetOrderHandler)
 		orderGroup.POST("/:id/payment-screenshot",orders.UploadPaymentScreenshotHandler)
-		orderGroup.PUT("/:id/status", utils.RoleMiddleware("printing"), orders.UpdateOrderStatusHandler)
-		orderGroup.GET("/get-all-orders", utils.RoleMiddleware("printing"), orders.GetAllOrdersForPrinting)
+		orderGroup.PUT("/:id/status", orders.UpdateOrderStatusHandler)
+		orderGroup.GET("/get-all-orders", orders.GetAllOrdersHandler)
 		orderGroup.GET("/:id/tracking", orders.GetOrderTrackingHandler)
 	}
 }
