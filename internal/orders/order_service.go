@@ -169,8 +169,10 @@ func UpdateOrderStatusService(userID, role, orderID string, req UpdateOrderStatu
 
 	switch role {
 	case "admin":
-		if req.Status == "declined" || req.Status == "payment-rejected" && req.Reason == "" {
-			req.Reason = "No reason provided"
+		if req.Status == "declined" || req.Status == "payment_rejected" {
+			if req.Reason == "" {
+				return errors.New("reason is required for declined orders")
+			}
 		}
 	case "printing":
 		if order.Status != "placed" {
