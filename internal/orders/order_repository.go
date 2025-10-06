@@ -117,7 +117,7 @@ func GetOrderByIDAndCompanyID(orderID, companyID string) (*OrderResponse, error)
 	return order, nil
 }
 
-func UpdateOrderStatus(orderID, status, reason, changedBy string) error {
+func UpdateOrderStatus(orderID, status, changedBy, reason string) error {
 	tx, err := db.DB.Begin()
 	if err != nil {
 		return err
