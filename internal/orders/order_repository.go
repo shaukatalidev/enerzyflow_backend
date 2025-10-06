@@ -95,14 +95,14 @@ func GetOrdersCountByCompanyID(companyID string) (int, error) {
 	return count, err
 }
 
-func GetOrderByIDAndCompanyID(orderID, companyID string) (*OrderResponse, error) {
+func GetOrderByID(orderID string) (*OrderResponse, error) {
 	row := db.DB.QueryRow(`
         SELECT o.order_id, o.company_id, l.label_url AS label_url, 
                o.variant, o.qty, o.cap_color, o.volume, 
                o.status,o.decline_reason,o.payment_screenshot_url,o.invoice_url,o.created_at, o.updated_at, o.expected_delivery_date
         FROM orders o
         LEFT JOIN labels l ON o.label_id = l.label_id
-        WHERE o.order_id = $1 AND o.company_id = $2`, orderID, companyID)
+        WHERE o.order_id = $1 `, orderID)
 
 	order := &OrderResponse{}
 	err := row.Scan(&order.OrderID, &order.CompanyID, &order.LabelURL, &order.Variant,
@@ -128,7 +128,6 @@ func UpdateOrderStatus(orderID, status, changedBy, reason string) error {
 		}
 	}()
 
-	// 1️⃣ Update current status in orders table
 	_, err = tx.Exec(`
 		UPDATE orders 
 		SET status = $1, updated_at = NOW() 
@@ -138,7 +137,6 @@ func UpdateOrderStatus(orderID, status, changedBy, reason string) error {
 		return err
 	}
 
-	// 2️⃣ Insert into status history
 	_, err = tx.Exec(`
 		INSERT INTO order_status_history (order_id, status, changed_at, changed_by, reason)
 		VALUES ($1, $2, NOW(), $3, $4)
@@ -173,7 +171,7 @@ func GetOrderStatusHistory(orderID string) ([]OrderStatusHistory, error) {
 	return history, nil
 }
 
-func GetAllOrders(limit, offset int) ([]AllOrderModel, error) {
+func GetAllOrders(limit, offset int, statusFilter *string) ([]AllOrderModel, error) {
 	query := `
 	SELECT 
 		o.order_id,
@@ -197,11 +195,18 @@ func GetAllOrders(limit, offset int) ([]AllOrderModel, error) {
 	LEFT JOIN labels l ON o.label_id = l.label_id
 	INNER JOIN companies c ON o.company_id = c.company_id
 	INNER JOIN users u ON c.user_id = u.user_id
-	WHERE o.status = 'placed'
-	ORDER BY o.created_at DESC
-	LIMIT $1 OFFSET $2
-`
-	rows, err := db.DB.Query(query, limit, offset)
+	`
+
+	var rows *sql.Rows
+	var err error
+	if statusFilter != nil && *statusFilter != "" {
+		query += ` WHERE o.status = $3 ORDER BY o.created_at DESC LIMIT $1 OFFSET $2`
+		rows, err = db.DB.Query(query, limit, offset, *statusFilter)
+	} else {
+		query += ` ORDER BY o.created_at DESC LIMIT $1 OFFSET $2`
+		rows, err = db.DB.Query(query, limit, offset)
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +217,9 @@ func GetAllOrders(limit, offset int) ([]AllOrderModel, error) {
 		var o AllOrderModel
 		if err := rows.Scan(
 			&o.OrderID, &o.CompanyID, &o.CompanyName, &o.LabelID, &o.LabelURL, &o.Variant, &o.Qty,
-			&o.CapColor, &o.Volume, &o.Status,&o.PaymentUrl,&o.InvoiceUrl,&o.DeclineReason, &o.CreatedAt, &o.UpdatedAt, &o.UserName,&o.ExpectedDelivery); err != nil {
+			&o.CapColor, &o.Volume, &o.Status, &o.PaymentUrl, &o.InvoiceUrl, &o.DeclineReason,
+			&o.CreatedAt, &o.UpdatedAt, &o.UserName, &o.ExpectedDelivery,
+		); err != nil {
 			return nil, err
 		}
 		orders = append(orders, o)
@@ -253,6 +260,33 @@ func UpdateOrderPaymentScreenshot(orderID, screenshotURL, userID string) error {
 	`, orderID, "payment_uploaded", userID)
 	if err != nil {
 		return fmt.Errorf("failed to insert into order_status_history: %w", err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func UpdateOrderInvoice(orderID, invoiceURL string) error {
+	if orderID == "" || invoiceURL == "" {
+		return errors.New("orderID and screenshotURL cannot be empty")
+	}
+
+	tx, err := db.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	_, err = tx.Exec(`UPDATE orders SET invoice_url = $1, updated_at = NOW() WHERE order_id = $2`,invoiceURL, orderID)
+	if err != nil {
+		return fmt.Errorf("failed to update order invoice: %w", err)
 	}
 
 	if err = tx.Commit(); err != nil {
