@@ -43,6 +43,9 @@ func CreateOrderService(userID string, req CreateOrderRequest) (*OrderResponse, 
 		CapColor:  req.CapColor,
 		Volume:    req.Volume,
 		Status: "payment-pending",
+		ExpectedDelivery: time.Now().Add(5 * 24 * time.Hour),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
 
 	if err := CreateOrder(order,userID); err != nil {
@@ -61,6 +64,7 @@ func CreateOrderService(userID string, req CreateOrderRequest) (*OrderResponse, 
 		CapColor:  req.CapColor,
 		Volume:    req.Volume,
 		Status:    "payment-pending",
+		ExpectedDelivery: order.ExpectedDelivery,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}, nil
@@ -98,6 +102,7 @@ func GetOrderService(userID, orderID string) (*OrderResponse, error) {
 		Status:    order.Status,
 		PaymentUrl:order.PaymentUrl,
 		InvoiceUrl:order.InvoiceUrl,
+		ExpectedDelivery: order.ExpectedDelivery,
 		CreatedAt: order.CreatedAt,
 		UpdatedAt: order.UpdatedAt,
 	}, nil
@@ -140,6 +145,7 @@ func GetOrdersService(userID string, limit, offset int) (*OrderListResponse, err
 			DeclineReason: order.DeclineReason,
 			PaymentUrl: order.PaymentUrl,
 			InvoiceUrl: order.InvoiceUrl,
+			ExpectedDelivery: order.ExpectedDelivery,
 			CreatedAt: order.CreatedAt,
 			UpdatedAt: order.UpdatedAt,
 		}

@@ -14,6 +14,7 @@ type Order struct {
 	Status    string    `json:"status"`
 	PaymentUrl    string    `json:"payment_url"`
 	InvoiceUrl    string    `json:"invoice_url"`
+	ExpectedDelivery time.Time `json:"expected_delivery"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -38,6 +39,7 @@ type OrderResponse struct {
 	DeclineReason string    `json:"decline_reason"`
 	PaymentUrl    string    `json:"payment_url"`
 	InvoiceUrl    string    `json:"invoice_url"`
+	ExpectedDelivery time.Time `json:"expected_delivery"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -66,6 +68,7 @@ type AllOrderModel struct {
 	DeclineReason string    `json:"decline_reason" db:"decline_reason"`
 	PaymentUrl    string    `json:"payment_url"`
 	InvoiceUrl    string    `json:"invoice_url"`
+	ExpectedDelivery time.Time `json:"expected_delivery" db:"expected_delivery_date"`
 	CreatedAt     time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at" db:"updated_at"`
 	UserName      string    `json:"user_name" db:"user_name"`

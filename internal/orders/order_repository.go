@@ -23,8 +23,8 @@ func CreateOrder(order *Order, userID string) error {
 	}()
 
 	_, err = tx.Exec(`
-        INSERT INTO orders (order_id, company_id, label_id, variant, qty, cap_color, volume, created_at, updated_at) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        INSERT INTO orders (order_id, company_id, label_id, variant, qty, cap_color, volume, created_at, updated_at, expected_delivery_date) 
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9,$10)`,
 		order.OrderID,
 		order.CompanyID,
 		order.LabelID,
@@ -34,6 +34,7 @@ func CreateOrder(order *Order, userID string) error {
 		order.Volume,
 		order.CreatedAt,
 		order.UpdatedAt,
+		order.ExpectedDelivery,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to insert order: %w", err)
@@ -58,7 +59,7 @@ func GetOrdersByCompanyID(companyID string, limit, offset int) ([]OrderResponse,
 	rows, err := db.DB.Query(`
         SELECT o.order_id, o.company_id, l.label_url AS label_url, 
             o.variant, o.qty, o.cap_color, o.volume, 
-            o.status,o.payment_screenshot_url,o.invoice_url,o.created_at, o.updated_at
+            o.status,o.decline_reason,o.payment_screenshot_url,o.invoice_url,o.created_at, o.updated_at, o.expected_delivery_date
         FROM orders o
         LEFT JOIN labels l ON o.label_id = l.label_id
         WHERE o.company_id = $1 
@@ -74,7 +75,7 @@ func GetOrdersByCompanyID(companyID string, limit, offset int) ([]OrderResponse,
 	for rows.Next() {
 		var order OrderResponse
 		err := rows.Scan(&order.OrderID, &order.CompanyID, &order.LabelURL, &order.Variant,
-			&order.Qty, &order.CapColor, &order.Volume, &order.Status,&order.DeclineReason,&order.PaymentUrl,&order.InvoiceUrl, &order.CreatedAt, &order.UpdatedAt)
+			&order.Qty, &order.CapColor, &order.Volume, &order.Status,&order.DeclineReason,&order.PaymentUrl,&order.InvoiceUrl, &order.CreatedAt, &order.UpdatedAt,&order.ExpectedDelivery)
 		if err != nil {
 			return nil, err
 		}
@@ -98,14 +99,14 @@ func GetOrderByIDAndCompanyID(orderID, companyID string) (*OrderResponse, error)
 	row := db.DB.QueryRow(`
         SELECT o.order_id, o.company_id, l.label_url AS label_url, 
                o.variant, o.qty, o.cap_color, o.volume, 
-               o.status,o.decline_reason,o.payment_screenshot_url,o.invoice_url,o.created_at, o.updated_at
+               o.status,o.decline_reason,o.payment_screenshot_url,o.invoice_url,o.created_at, o.updated_at, o.expected_delivery_date
         FROM orders o
         LEFT JOIN labels l ON o.label_id = l.label_id
         WHERE o.order_id = $1 AND o.company_id = $2`, orderID, companyID)
 
 	order := &OrderResponse{}
 	err := row.Scan(&order.OrderID, &order.CompanyID, &order.LabelURL, &order.Variant,
-		&order.Qty, &order.CapColor, &order.Volume, &order.Status,&order.DeclineReason,&order.PaymentUrl,&order.InvoiceUrl, &order.CreatedAt, &order.UpdatedAt)
+		&order.Qty, &order.CapColor, &order.Volume, &order.Status,&order.DeclineReason,&order.PaymentUrl,&order.InvoiceUrl, &order.CreatedAt, &order.UpdatedAt,&order.ExpectedDelivery)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -190,7 +191,8 @@ func GetAllOrders(limit, offset int) ([]AllOrderModel, error) {
 		COALESCE(o.decline_reason, '') AS decline_reason,
 		o.created_at,
 		o.updated_at,
-		u.name AS user_name
+		u.name AS user_name,
+		o.expected_delivery_date
 	FROM orders o
 	LEFT JOIN labels l ON o.label_id = l.label_id
 	INNER JOIN companies c ON o.company_id = c.company_id
@@ -210,7 +212,7 @@ func GetAllOrders(limit, offset int) ([]AllOrderModel, error) {
 		var o AllOrderModel
 		if err := rows.Scan(
 			&o.OrderID, &o.CompanyID, &o.CompanyName, &o.LabelID, &o.LabelURL, &o.Variant, &o.Qty,
-			&o.CapColor, &o.Volume, &o.Status,&o.PaymentUrl,&o.InvoiceUrl,&o.DeclineReason, &o.CreatedAt, &o.UpdatedAt, &o.UserName); err != nil {
+			&o.CapColor, &o.Volume, &o.Status,&o.PaymentUrl,&o.InvoiceUrl,&o.DeclineReason, &o.CreatedAt, &o.UpdatedAt, &o.UserName,&o.ExpectedDelivery); err != nil {
 			return nil, err
 		}
 		orders = append(orders, o)
