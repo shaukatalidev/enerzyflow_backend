@@ -5,8 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"time"
-
 	"github.com/google/uuid"
+	"mime/multipart"
+	"github.com/cloudinary/cloudinary-go/v2"
+	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
+	"os"
+	"context"
 )
 
 func CreateOrderService(userID string, req CreateOrderRequest) (*OrderResponse, error) {
@@ -38,12 +42,17 @@ func CreateOrderService(userID string, req CreateOrderRequest) (*OrderResponse, 
 		Qty:       req.Qty,
 		CapColor:  req.CapColor,
 		Volume:    req.Volume,
-		Status:    "placed",
+		Status: "payment-pending",
+		ExpectedDelivery: time.Now().Add(5 * 24 * time.Hour),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
 
-	if err := CreateOrder(order); err != nil {
+	if err := CreateOrder(order,userID); err != nil {
 		return nil, fmt.Errorf("failed to insert order: %w", err)
 	}
+
+	
 
 
 	return &OrderResponse{
@@ -54,7 +63,8 @@ func CreateOrderService(userID string, req CreateOrderRequest) (*OrderResponse, 
 		Qty:       req.Qty,
 		CapColor:  req.CapColor,
 		Volume:    req.Volume,
-		Status:    "placed",
+		Status:    "payment-pending",
+		ExpectedDelivery: order.ExpectedDelivery,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}, nil
@@ -90,6 +100,9 @@ func GetOrderService(userID, orderID string) (*OrderResponse, error) {
 		CapColor:  order.CapColor,
 		Volume:    order.Volume,
 		Status:    order.Status,
+		PaymentUrl:order.PaymentUrl,
+		InvoiceUrl:order.InvoiceUrl,
+		ExpectedDelivery: order.ExpectedDelivery,
 		CreatedAt: order.CreatedAt,
 		UpdatedAt: order.UpdatedAt,
 	}, nil
@@ -129,6 +142,10 @@ func GetOrdersService(userID string, limit, offset int) (*OrderListResponse, err
 			CapColor:  order.CapColor,
 			Volume:    order.Volume,
 			Status:    order.Status,
+			DeclineReason: order.DeclineReason,
+			PaymentUrl: order.PaymentUrl,
+			InvoiceUrl: order.InvoiceUrl,
+			ExpectedDelivery: order.ExpectedDelivery,
 			CreatedAt: order.CreatedAt,
 			UpdatedAt: order.UpdatedAt,
 		}
@@ -138,4 +155,62 @@ func GetOrdersService(userID string, limit, offset int) (*OrderListResponse, err
 		Orders: orderResponses,
 		Total:  total,
 	}, nil
+}
+
+func GetAllOrdersService(userID string, limit, offset int) ([]AllOrderModel, error) {
+	return GetAllOrders(limit, offset)
+}
+
+func UpdateOrderStatusService(userID, orderID string, req UpdateOrderStatusRequest) error {
+	fmt.Println(req.Status)
+	if req.Status == "declined" && req.Reason == "" {
+		return errors.New("reason is required when canceling order")
+	}
+
+	newStatus := req.Status
+	if req.Status == "accepted" {
+		newStatus = "printing"
+		req.Reason = ""
+	}
+
+	return UpdateOrderStatus(orderID, newStatus, userID,req.Reason)
+}
+
+func GetOrderTrackingService(orderID string) ([]OrderStatusHistory, error) {
+	return GetOrderStatusHistory(orderID)
+}
+
+func UploadPaymentScreenshotService(orderID string, fileHeader *multipart.FileHeader, userID string) (string, error) {
+	if fileHeader == nil {
+		return "", errors.New("file cannot be nil")
+	}
+
+	file, err := fileHeader.Open()
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	cld, err := cloudinary.NewFromParams(
+		os.Getenv("CLOUDINARY_CLOUD_NAME"),
+		os.Getenv("CLOUDINARY_API_KEY"),
+		os.Getenv("CLOUDINARY_API_SECRET"),
+	)
+	if err != nil {
+		return "", err
+	}
+
+	uploadResult, err := cld.Upload.Upload(context.Background(), file, uploader.UploadParams{
+		Folder: "orders/payment_screenshots",
+		PublicID: orderID, 
+	})
+	if err != nil {
+		return "", err
+	}
+
+	if err := UpdateOrderPaymentScreenshot(orderID, uploadResult.SecureURL, userID); err != nil {
+		return "", err
+	}
+
+	return uploadResult.SecureURL, nil
 }

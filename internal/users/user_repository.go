@@ -18,6 +18,18 @@ func GetUserByEmail(email string) (*User, error) {
     return u, nil
 }
 
+func GetUserByPhone(phone string) (*User, error) {
+    row:= db.DB.QueryRow("SELECT user_id, email, name, phone, designation, role, profile_url FROM users WHERE phone = $1", phone)
+    u := &User{}
+    if err := row.Scan(&u.UserID, &u.Email, &u.Name, &u.Phone, &u.Designation, &u.Role, &u.ProfileURL); err != nil {
+        if err == sql.ErrNoRows {
+            return nil, nil
+        }
+        return nil, err
+    }
+    return u, nil
+}
+
 func GetUserByID(userID string) (*User, error) {
     row := db.DB.QueryRow("SELECT user_id, email, name, COALESCE(phone, ''), designation, role, profile_url FROM users WHERE user_id = $1", userID)
     u := &User{}
@@ -50,3 +62,4 @@ func UpdateUserProfileTx(tx *sql.Tx, u *User) error {
     _, err := tx.Exec(`UPDATE users SET name = $1, phone = $2, designation = $3, profile_url = $4, updated_at = CURRENT_TIMESTAMP WHERE user_id = $5`, u.Name, u.Phone, u.Designation, u.ProfileURL, u.UserID)
     return err
 }
+

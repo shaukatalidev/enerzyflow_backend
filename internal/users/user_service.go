@@ -2,9 +2,9 @@ package users
 
 import (
 	"database/sql"
-	"errors"
 	"enerzyflow_backend/internal/companies"
 	"enerzyflow_backend/internal/db"
+	"errors"
 	"github.com/google/uuid"
 )
 
@@ -46,6 +46,16 @@ func SaveProfileService(authenticatedUserID string, req SaveProfileRequest) (*Sa
 		}
 	}()
 
+	if req.Profile.Phone != "" {
+		existingUser, err := GetUserByPhone(req.Profile.Phone)
+		if err != nil {
+			return nil, err
+		}
+		if existingUser != nil && existingUser.UserID != authenticatedUserID {
+			return nil, errors.New("phone number already in use by another user")
+		}
+	}
+
 	u.Name = req.Profile.Name
 	u.Phone = req.Profile.Phone
 	u.Designation = req.Profile.Designation
@@ -84,7 +94,7 @@ func SaveProfileService(authenticatedUserID string, req SaveProfileRequest) (*Sa
 			Address:   o.Address,
 		})
 	}
-	if err = companies.ReplaceCompanyOutletsTx(tx, company.CompanyID, outlets); err != nil {
+	if err = companies.SaveCompanyOutletsService(tx, company.CompanyID, outlets); err != nil {
 		return nil, err
 	}
 
@@ -92,7 +102,7 @@ func SaveProfileService(authenticatedUserID string, req SaveProfileRequest) (*Sa
 	for _, l := range req.Labels {
 		id := l.LabelID
 		if id == "" {
-			id = uuid.New().String() 
+			id = uuid.New().String()
 		}
 
 		label := companies.Label{
@@ -111,7 +121,7 @@ func SaveProfileService(authenticatedUserID string, req SaveProfileRequest) (*Sa
 		})
 	}
 
-	blocked, err := companies.ReplaceCompanyLabelsTx(tx, company.CompanyID, labelsToSave)
+	blocked, err := companies.SaveCompanyLabelsService(tx, company.CompanyID, labelsToSave)
 	if err != nil {
 		return nil, err
 	}
