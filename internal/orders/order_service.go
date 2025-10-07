@@ -5,12 +5,14 @@ import (
 	"enerzyflow_backend/internal/companies"
 	"errors"
 	"fmt"
+	"mime/multipart"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/cloudinary/cloudinary-go/v2"
 	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
 	"github.com/google/uuid"
-	"mime/multipart"
-	"os"
-	"time"
 )
 
 func CreateOrderService(userID string, req CreateOrderRequest) (*OrderResponse, error) {
@@ -166,61 +168,70 @@ func UpdateOrderStatusService(userID, role, orderID string, req UpdateOrderStatu
 	switch role {
 	case "admin":
 		validStatuses := map[string]bool{
-			"placed":             true,
-			"printing":           true,
-			"ready_for_plant":    true,
-			"plant_processing":   true,
-			"dispatched":         true,
-			"completed":          true,
-			"declined":           true,
+			"placed":           true,
+			"printing":         true,
+			"ready_for_plant":  true,
+			"plant_processing": true,
+			"dispatched":       true,
+			"completed":        true,
+			"declined":         true,
 		}
 
 		if !validStatuses[req.Status] {
 			return fmt.Errorf("invalid status '%s' for admin", req.Status)
 		}
+		fmt.Println("Reason", req.Reason)
+		if req.Status == "declined" {
+			reason := strings.TrimSpace(req.Reason)
+			reason = strings.Trim(reason, `"`)
+			if reason == "" {
+				return errors.New("reason required when declining an order")
+			}
+			req.Reason = reason
+		}
 
-		if req.Status == "declined" && req.Reason == "" {
-			return errors.New("reason required when declining an order")
+		if req.Status != "declined" && order.PaymentStatus != "payment_verified" {
+			return fmt.Errorf("cannot update order status until payment is verified")
 		}
 
 		return UpdateOrderStatus(orderID, req.Status, userID, req.Reason)
 
 	case "printing":
-	if order.PaymentStatus != "payment_verified" {
-		return errors.New("printing can only handle payment-verified orders")
-	}
+		if order.PaymentStatus != "payment_verified" {
+			return errors.New("printing can only handle payment-verified orders")
+		}
 
-	switch order.Status {
-	case "placed":
-		switch req.Status {
-		case "accepted":
-			return UpdateOrderStatus(orderID, "printing", userID, "")
-		case "declined":
-			if req.Reason == "" {
-				return errors.New("reason required when declining order")
+		switch order.Status {
+		case "placed":
+			switch req.Status {
+			case "accepted":
+				return UpdateOrderStatus(orderID, "printing", userID, "")
+			case "declined":
+				if req.Reason == "" {
+					return errors.New("reason required when declining order")
+				}
+				return UpdateOrderStatus(orderID, "declined", userID, req.Reason)
+			default:
+				return errors.New("printing can only accept or decline orders")
 			}
-			return UpdateOrderStatus(orderID, "declined", userID, req.Reason)
+		case "printing":
+			if req.Status == "ready_for_plant" {
+				return UpdateOrderStatus(orderID, "ready_for_plant", userID, "")
+			}
+			return errors.New("invalid status update from printing")
 		default:
-			return errors.New("printing can only accept or decline orders")
+			return errors.New("printing cannot handle this status")
 		}
-	case "printing": 
-		if req.Status == "ready_for_plant" {
-			return UpdateOrderStatus(orderID, "ready_for_plant", userID, "")
-		}
-		return errors.New("invalid status update from printing")
-	default:
-		return errors.New("printing cannot handle this status")
-	}
 
 	case "plant":
-	switch order.Status {
-	case "ready_for_plant":
-		return UpdateOrderStatus(orderID, "plant_processing", userID, "")
-	case "plant_processing":
-		return UpdateOrderStatus(orderID, "dispatched", userID, "")
-	default:
-		return errors.New("plant can only handle 'ready_for_plant' or 'plant_processing' statuses")
-	}
+		switch order.Status {
+		case "ready_for_plant":
+			return UpdateOrderStatus(orderID, "plant_processing", userID, "")
+		case "plant_processing":
+			return UpdateOrderStatus(orderID, "dispatched", userID, "")
+		default:
+			return errors.New("plant can only handle 'ready_for_plant' or 'plant_processing' statuses")
+		}
 
 	default:
 		return errors.New("unauthorized role")
@@ -245,6 +256,9 @@ func UpdatePaymentStatusService(orderID, paymentStatus, reason, adminID string) 
 		return UpdatePaymentStatus(orderID, "payment_verified", adminID, "")
 
 	case "payment_rejected":
+		if reason == "" {
+			return errors.New("reason required when rejecting payment")
+		}
 		return UpdatePaymentStatus(orderID, "payment_rejected", adminID, reason)
 
 	default:
