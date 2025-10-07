@@ -241,12 +241,12 @@ func GetAllOrders(limit, offset int, role string) ([]AllOrderModel, error) {
 		rows, err = db.DB.Query(query, limit, offset)
 
 	case "printing":
-		statuses := []string{"placed", "printing", "declined", "ready_for_plant"}
+		statuses := []string{"placed", "printing", "declined", "ready_for_plant","plant_processing","dispatched","completed",}
 		query += ` WHERE o.payment_status = 'payment_verified' AND o.status = ANY($3) ORDER BY o.created_at DESC LIMIT $1 OFFSET $2`
 		rows, err = db.DB.Query(query, limit, offset, pq.Array(statuses))
 
 	case "plant":
-		statuses := []string{"ready_for_plant", "plant_processing"}
+		statuses := []string{"ready_for_plant", "plant_processing","dispatched","completed"}
 		query += ` WHERE o.status = ANY($3) ORDER BY o.created_at DESC LIMIT $1 OFFSET $2`
 		rows, err = db.DB.Query(query, limit, offset, pq.Array(statuses))
 

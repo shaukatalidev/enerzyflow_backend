@@ -170,7 +170,6 @@ func UpdateOrderStatusService(userID, role, orderID string, req UpdateOrderStatu
 			"printing":           true,
 			"ready_for_plant":    true,
 			"plant_processing":   true,
-			"ready_for_dispatch": true,
 			"dispatched":         true,
 			"completed":          true,
 			"declined":           true,
@@ -218,7 +217,7 @@ func UpdateOrderStatusService(userID, role, orderID string, req UpdateOrderStatu
 	case "ready_for_plant":
 		return UpdateOrderStatus(orderID, "plant_processing", userID, "")
 	case "plant_processing":
-		return UpdateOrderStatus(orderID, "ready_for_dispatch", userID, "")
+		return UpdateOrderStatus(orderID, "dispatched", userID, "")
 	default:
 		return errors.New("plant can only handle 'ready_for_plant' or 'plant_processing' statuses")
 	}
