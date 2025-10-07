@@ -5,6 +5,8 @@ import (
 	"enerzyflow_backend/internal/db"
 	"errors"
 	"fmt"
+
+	"github.com/lib/pq"
 )
 
 func CreateOrder(order *Order, userID string) error {
@@ -59,7 +61,7 @@ func GetOrdersByCompanyID(companyID string, limit, offset int) ([]OrderResponse,
 	rows, err := db.DB.Query(`
         SELECT o.order_id, o.company_id, l.label_url AS label_url, 
             o.variant, o.qty, o.cap_color, o.volume, 
-            o.status,o.decline_reason,o.payment_screenshot_url,o.invoice_url,o.created_at, o.updated_at, o.expected_delivery_date
+            o.status,o.payment_status,o.decline_reason,o.payment_screenshot_url,o.invoice_url,o.created_at, o.updated_at, o.expected_delivery_date
         FROM orders o
         LEFT JOIN labels l ON o.label_id = l.label_id
         WHERE o.company_id = $1 
@@ -75,7 +77,7 @@ func GetOrdersByCompanyID(companyID string, limit, offset int) ([]OrderResponse,
 	for rows.Next() {
 		var order OrderResponse
 		err := rows.Scan(&order.OrderID, &order.CompanyID, &order.LabelURL, &order.Variant,
-			&order.Qty, &order.CapColor, &order.Volume, &order.Status,&order.DeclineReason,&order.PaymentUrl,&order.InvoiceUrl, &order.CreatedAt, &order.UpdatedAt,&order.ExpectedDelivery)
+			&order.Qty, &order.CapColor, &order.Volume, &order.Status, &order.PaymentStatus, &order.DeclineReason, &order.PaymentUrl, &order.InvoiceUrl, &order.CreatedAt, &order.UpdatedAt, &order.ExpectedDelivery)
 		if err != nil {
 			return nil, err
 		}
@@ -99,14 +101,14 @@ func GetOrderByID(orderID string) (*OrderResponse, error) {
 	row := db.DB.QueryRow(`
         SELECT o.order_id, o.company_id, l.label_url AS label_url, 
                o.variant, o.qty, o.cap_color, o.volume, 
-               o.status,o.decline_reason,o.payment_screenshot_url,o.invoice_url,o.created_at, o.updated_at, o.expected_delivery_date
+               o.status,o.payment_status,o.decline_reason,o.payment_screenshot_url,o.invoice_url,o.created_at, o.updated_at, o.expected_delivery_date
         FROM orders o
         LEFT JOIN labels l ON o.label_id = l.label_id
         WHERE o.order_id = $1 `, orderID)
 
 	order := &OrderResponse{}
 	err := row.Scan(&order.OrderID, &order.CompanyID, &order.LabelURL, &order.Variant,
-		&order.Qty, &order.CapColor, &order.Volume, &order.Status,&order.DeclineReason,&order.PaymentUrl,&order.InvoiceUrl, &order.CreatedAt, &order.UpdatedAt,&order.ExpectedDelivery)
+		&order.Qty, &order.CapColor, &order.Volume, &order.Status, &order.PaymentStatus, &order.DeclineReason, &order.PaymentUrl, &order.InvoiceUrl, &order.CreatedAt, &order.UpdatedAt, &order.ExpectedDelivery)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -148,6 +150,38 @@ func UpdateOrderStatus(orderID, status, changedBy, reason string) error {
 	return tx.Commit()
 }
 
+func UpdatePaymentStatus(orderID, paymentStatus, changedBy, reason string) error {
+	tx, err := db.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	_, err = tx.Exec(`
+		UPDATE orders
+		SET payment_status = $1,
+		    updated_at = NOW()
+		WHERE order_id = $2
+	`, paymentStatus, orderID)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(`
+		INSERT INTO order_status_history (order_id, status, changed_at, changed_by, reason)
+		VALUES ($1, $2, NOW(), $3, $4)
+	`, orderID, paymentStatus, changedBy, reason)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
 func GetOrderStatusHistory(orderID string) ([]OrderStatusHistory, error) {
 	rows, err := db.DB.Query(`
 		SELECT status, changed_at, changed_by, reason
@@ -171,7 +205,7 @@ func GetOrderStatusHistory(orderID string) ([]OrderStatusHistory, error) {
 	return history, nil
 }
 
-func GetAllOrders(limit, offset int, statusFilter *string) ([]AllOrderModel, error) {
+func GetAllOrders(limit, offset int, role string) ([]AllOrderModel, error) {
 	query := `
 	SELECT 
 		o.order_id,
@@ -184,6 +218,7 @@ func GetAllOrders(limit, offset int, statusFilter *string) ([]AllOrderModel, err
 		o.cap_color,
 		o.volume,
 		o.status,
+		o.payment_status,
 		o.payment_screenshot_url,
 		o.invoice_url,
 		COALESCE(o.decline_reason, '') AS decline_reason,
@@ -199,12 +234,24 @@ func GetAllOrders(limit, offset int, statusFilter *string) ([]AllOrderModel, err
 
 	var rows *sql.Rows
 	var err error
-	if statusFilter != nil && *statusFilter != "" {
-		query += ` WHERE o.status = $3 ORDER BY o.created_at DESC LIMIT $1 OFFSET $2`
-		rows, err = db.DB.Query(query, limit, offset, *statusFilter)
-	} else {
+
+	switch role {
+	case "admin":
 		query += ` ORDER BY o.created_at DESC LIMIT $1 OFFSET $2`
 		rows, err = db.DB.Query(query, limit, offset)
+
+	case "printing":
+		statuses := []string{"placed", "printing", "declined", "ready_for_plant","plant_processing","dispatched","completed",}
+		query += ` WHERE o.payment_status = 'payment_verified' AND o.status = ANY($3) ORDER BY o.created_at DESC LIMIT $1 OFFSET $2`
+		rows, err = db.DB.Query(query, limit, offset, pq.Array(statuses))
+
+	case "plant":
+		statuses := []string{"ready_for_plant", "plant_processing","dispatched","completed"}
+		query += ` WHERE o.status = ANY($3) ORDER BY o.created_at DESC LIMIT $1 OFFSET $2`
+		rows, err = db.DB.Query(query, limit, offset, pq.Array(statuses))
+
+	default:
+		return nil, fmt.Errorf("unauthorized role: %s", role)
 	}
 
 	if err != nil {
@@ -217,7 +264,7 @@ func GetAllOrders(limit, offset int, statusFilter *string) ([]AllOrderModel, err
 		var o AllOrderModel
 		if err := rows.Scan(
 			&o.OrderID, &o.CompanyID, &o.CompanyName, &o.LabelID, &o.LabelURL, &o.Variant, &o.Qty,
-			&o.CapColor, &o.Volume, &o.Status, &o.PaymentUrl, &o.InvoiceUrl, &o.DeclineReason,
+			&o.CapColor, &o.Volume, &o.Status, &o.PaymentStatus, &o.PaymentUrl, &o.InvoiceUrl, &o.DeclineReason,
 			&o.CreatedAt, &o.UpdatedAt, &o.UserName, &o.ExpectedDelivery,
 		); err != nil {
 			return nil, err
@@ -246,7 +293,7 @@ func UpdateOrderPaymentScreenshot(orderID, screenshotURL, userID string) error {
 	_, err = tx.Exec(`
 		UPDATE orders
 		SET payment_screenshot_url = $1,
-		    status = 'payment_uploaded',
+		    payment_status = 'payment_uploaded',
 		    updated_at = NOW()
 		WHERE order_id = $2
 	`, screenshotURL, orderID)
@@ -284,7 +331,7 @@ func UpdateOrderInvoice(orderID, invoiceURL string) error {
 		}
 	}()
 
-	_, err = tx.Exec(`UPDATE orders SET invoice_url = $1, updated_at = NOW() WHERE order_id = $2`,invoiceURL, orderID)
+	_, err = tx.Exec(`UPDATE orders SET invoice_url = $1, updated_at = NOW() WHERE order_id = $2`, invoiceURL, orderID)
 	if err != nil {
 		return fmt.Errorf("failed to update order invoice: %w", err)
 	}
