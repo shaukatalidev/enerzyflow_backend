@@ -318,10 +318,6 @@ func UploadInvoiceService(orderID string, file *multipart.FileHeader) (string, e
 		return "", errors.New("order not found")
 	}
 
-	if order.PaymentStatus != "payment_verified" {
-		return "", errors.New("cannot upload invoice: payment not verified yet")
-	}
-
 	cld, err := cloudinary.NewFromParams(
 		os.Getenv("CLOUDINARY_CLOUD_NAME"),
 		os.Getenv("CLOUDINARY_API_KEY"),
