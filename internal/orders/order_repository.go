@@ -130,14 +130,23 @@ func UpdateOrderStatus(orderID, status, changedBy, reason string) error {
 		}
 	}()
 
+	if status == "declined" {
 	_, err = tx.Exec(`
 		UPDATE orders 
-		SET status = $1, updated_at = NOW() 
+		SET status = $1, decline_reason = $2, updated_at = NOW()
+		WHERE order_id = $3
+	`, status, reason, orderID)
+	}else{
+		_, err = tx.Exec(`
+		UPDATE orders 
+		SET status = $1, updated_at = NOW()
 		WHERE order_id = $2
 	`, status, orderID)
 	if err != nil {
 		return err
 	}
+	}
+	
 
 	_, err = tx.Exec(`
 		INSERT INTO order_status_history (order_id, status, changed_at, changed_by, reason)
