@@ -120,7 +120,7 @@ func GetAllOrdersHandler(c *gin.Context) {
 		offset = 0
 	}
 
-	orders, err := GetAllOrdersService(role, limit, offset)
+	orders,total, err := GetAllOrdersService(role, limit, offset)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -128,7 +128,7 @@ func GetAllOrdersHandler(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"orders": orders,
-		"count": len(orders),
+		"count": total,
 	})
 }
 
@@ -252,8 +252,19 @@ func GetOrderTrackingHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "order_id required"})
 		return
 	}
+	userIDVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthenticated"})
+		return
+	}
+	userID, ok := userIDVal.(uuid.UUID)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid user context"})
+		return
+	}
+	role:= c.GetString("role")
 
-	history, err := GetOrderTrackingService(orderID)
+	history, err := GetOrderTrackingService(orderID,userID.String(),role)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

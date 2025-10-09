@@ -4,7 +4,7 @@ import "time"
 
 type Order struct {
 	OrderID   string    `json:"order_id"`
-	CompanyID string    `json:"company_id"`
+	UserID 	  string    `json:"user_id"`
 	LabelID   string    `json:"label_id"` 
 	LabelURL   string    `json:"label_url"`
 	Variant   string    `json:"variant"`
@@ -30,7 +30,7 @@ type CreateOrderRequest struct {
 
 type OrderResponse struct {
 	OrderID   string    `json:"order_id"`
-	CompanyID string    `json:"company_id"`
+	UserID 	  string    `json:"user_id"`
 	LabelURL  string    `json:"label_url"`
 	Variant   string    `json:"variant"`
 	Qty       int       `json:"qty"`
@@ -58,6 +58,8 @@ type UpdateOrderStatusRequest struct {
 
 type AllOrderModel struct {
 	OrderID       string    `json:"order_id" db:"order_id"`
+	UserID 	  string    `json:"user_id"`
+	UserName      string    `json:"user_name" db:"user_name"`
 	CompanyID     string    `json:"company_id" db:"company_id"`
 	CompanyName   string    `json:"company_name" db:"company_name"`
 	LabelID       string    `json:"label_id" db:"label_id"`
@@ -74,7 +76,7 @@ type AllOrderModel struct {
 	ExpectedDelivery time.Time `json:"expected_delivery" db:"expected_delivery_date"`
 	CreatedAt     time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at" db:"updated_at"`
-	UserName      string    `json:"user_name" db:"user_name"`
+	
 }
 
 type OrderStatusHistory struct {

@@ -38,7 +38,7 @@ func CreateOrderService(userID string, req CreateOrderRequest) (*OrderResponse, 
 
 	order := &Order{
 		OrderID:          uuid.New().String(),
-		CompanyID:        company.CompanyID,
+		UserID:           userID,
 		LabelID:          req.LabelID,
 		Variant:          req.Variant,
 		Qty:              req.Qty,
@@ -56,7 +56,7 @@ func CreateOrderService(userID string, req CreateOrderRequest) (*OrderResponse, 
 
 	return &OrderResponse{
 		OrderID:          order.OrderID,
-		CompanyID:        company.CompanyID,
+		UserID:           userID,
 		LabelURL:         label.URL,
 		Variant:          req.Variant,
 		Qty:              req.Qty,
@@ -79,13 +79,16 @@ func GetOrderService(userID, orderID string) (*OrderResponse, error) {
 	if err != nil {
 		return nil, err
 	}
+	if order.UserID != userID {
+		return nil, errors.New("unauthorized access to order")
+	}
 	if order == nil {
 		return nil, errors.New("order not found")
 	}
 
 	return &OrderResponse{
 		OrderID:          order.OrderID,
-		CompanyID:        order.CompanyID,
+		UserID:           order.UserID,
 		LabelURL:         order.LabelURL,
 		Variant:          order.Variant,
 		Qty:              order.Qty,
@@ -115,12 +118,7 @@ func GetOrdersService(userID string, limit, offset int) (*OrderListResponse, err
 		return nil, errors.New("company not found for user")
 	}
 
-	orders, err := GetOrdersByCompanyID(company.CompanyID, limit, offset)
-	if err != nil {
-		return nil, err
-	}
-
-	total, err := GetOrdersCountByCompanyID(company.CompanyID)
+	orders,total, err := GetOrdersByUserID(userID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +127,7 @@ func GetOrdersService(userID string, limit, offset int) (*OrderListResponse, err
 	for i, order := range orders {
 		orderResponses[i] = OrderResponse{
 			OrderID:          order.OrderID,
-			CompanyID:        order.CompanyID,
+			UserID:           userID,
 			LabelURL:         order.LabelURL,
 			Variant:          order.Variant,
 			Qty:              order.Qty,
@@ -152,7 +150,7 @@ func GetOrdersService(userID string, limit, offset int) (*OrderListResponse, err
 	}, nil
 }
 
-func GetAllOrdersService(role string, limit, offset int) ([]AllOrderModel, error) {
+func GetAllOrdersService(role string, limit, offset int) ([]AllOrderModel,int, error) {
 	return GetAllOrders(limit, offset, role)
 }
 
@@ -266,7 +264,20 @@ func UpdatePaymentStatusService(orderID, paymentStatus, reason, adminID string) 
 	}
 }
 
-func GetOrderTrackingService(orderID string) ([]OrderStatusHistory, error) {
+func GetOrderTrackingService(orderID, userID, role string) ([]OrderStatusHistory, error) {
+	order, err := GetOrderByID(orderID)
+	if err != nil {
+		return nil, err
+	}
+	if order == nil {
+		return nil, errors.New("order not found")
+	}
+	if role == "business_owner" {
+		if order.UserID != userID {
+			return nil, errors.New("unauthorized access to order")
+		}
+	}
+
 	return GetOrderStatusHistory(orderID)
 }
 
