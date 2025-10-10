@@ -82,7 +82,7 @@ func GetOrdersByUserID(userID string, limit, offset int) ([]OrderResponse, int, 
 	for rows.Next() {
 		var order OrderResponse
 		err := rows.Scan(&order.OrderID, &order.UserID, &order.LabelURL, &order.Variant,
-			&order.Qty, &order.CapColor, &order.Volume, &order.Status, &order.PaymentStatus, &order.DeclineReason, &order.PaymentUrl, &order.InvoiceUrl,&order.PiUrl, &order.CreatedAt, &order.UpdatedAt, &order.ExpectedDelivery, &total)
+			&order.Qty, &order.CapColor, &order.Volume, &order.Status, &order.PaymentStatus, &order.DeclineReason, &order.PaymentUrl, &order.InvoiceUrl, &order.PiUrl, &order.CreatedAt, &order.UpdatedAt, &order.ExpectedDelivery, &total)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -113,7 +113,7 @@ func GetOrderByID(orderID string) (*OrderResponse, error) {
 
 	order := &OrderResponse{}
 	err := row.Scan(&order.OrderID, &order.UserID, &order.LabelURL, &order.Variant,
-		&order.Qty, &order.CapColor, &order.Volume, &order.Status, &order.PaymentStatus, &order.DeclineReason, &order.PaymentUrl, &order.InvoiceUrl, &order.PiUrl,&order.CreatedAt, &order.UpdatedAt, &order.ExpectedDelivery)
+		&order.Qty, &order.CapColor, &order.Volume, &order.Status, &order.PaymentStatus, &order.DeclineReason, &order.PaymentUrl, &order.InvoiceUrl, &order.PiUrl, &order.CreatedAt, &order.UpdatedAt, &order.ExpectedDelivery)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -140,13 +140,13 @@ func UpdateOrderStatus(orderID, status, changedBy, reason string) error {
 		UPDATE orders 
 		SET status = $1, decline_reason = $2, updated_at = $3
 		WHERE order_id = $4
-	`, status, reason, utils.NowInIST(),orderID)
+	`, status, reason, utils.NowInIST(), orderID)
 	} else {
 		_, err = tx.Exec(`
 		UPDATE orders 
 		SET status = $1, updated_at = $2
 		WHERE order_id = $3
-	`, status, utils.NowInIST(),orderID)
+	`, status, utils.NowInIST(), orderID)
 		if err != nil {
 			return err
 		}
@@ -155,7 +155,7 @@ func UpdateOrderStatus(orderID, status, changedBy, reason string) error {
 	_, err = tx.Exec(`
 		INSERT INTO order_status_history (order_id, status, changed_at, changed_by, reason)
 		VALUES ($1, $2, $3, $4, $5)
-	`, orderID, status, utils.NowInIST(),changedBy, reason)
+	`, orderID, status, utils.NowInIST(), changedBy, reason)
 	if err != nil {
 		return err
 	}
@@ -179,7 +179,7 @@ func UpdatePaymentStatus(orderID, paymentStatus, changedBy, reason string) error
 		SET payment_status = $1,
 		    updated_at = $2
 		WHERE order_id = $3
-	`, paymentStatus, utils.NowInIST(),orderID)
+	`, paymentStatus, utils.NowInIST(), orderID)
 	if err != nil {
 		return err
 	}
@@ -187,7 +187,7 @@ func UpdatePaymentStatus(orderID, paymentStatus, changedBy, reason string) error
 	_, err = tx.Exec(`
 		INSERT INTO order_status_history (order_id, status, changed_at, changed_by, reason)
 		VALUES ($1, $2, $3, $4, $5)
-	`, orderID, paymentStatus, utils.NowInIST(),changedBy, reason)
+	`, orderID, paymentStatus, utils.NowInIST(), changedBy, reason)
 	if err != nil {
 		return err
 	}
@@ -255,7 +255,7 @@ func GetAllOrders(limit, offset int, role, userID string) ([]AllOrderModel, int,
 		rows, err = db.DB.Query(query, limit, offset)
 
 	case "printing":
-	query := `
+		query := `
 	SELECT 
 		o.order_id,
 		o.user_id,
@@ -287,10 +287,10 @@ func GetAllOrders(limit, offset int, role, userID string) ([]AllOrderModel, int,
 		AND NOT (o.status = 'declined' AND oa.user_id IS DISTINCT FROM $3)
 	ORDER BY o.created_at DESC LIMIT $1 OFFSET $2
 	`
-	rows, err = db.DB.Query(query, limit, offset, userID)
+		rows, err = db.DB.Query(query, limit, offset, userID)
 
-case "plant":
-	query := `
+	case "plant":
+		query := `
 	SELECT 
 		o.order_id,
 		o.user_id,
@@ -318,7 +318,7 @@ case "plant":
 		AND (oa.user_id IS NULL OR oa.user_id = $3)
 	ORDER BY o.created_at DESC LIMIT $1 OFFSET $2
 	`
-	rows, err = db.DB.Query(query, limit, offset, userID)
+		rows, err = db.DB.Query(query, limit, offset, userID)
 
 	default:
 		return nil, 0, fmt.Errorf("unauthorized role: %s", role)
@@ -339,7 +339,7 @@ case "plant":
 			if err := rows.Scan(
 				&o.OrderID, &o.UserID, &o.CompanyName, &o.LabelID, &o.LabelURL,
 				&o.Variant, &o.Qty, &o.CapColor, &o.Volume, &o.Status,
-				&o.PaymentStatus, &o.PaymentUrl, &o.InvoiceUrl, &o.PiUrl,&o.DeclineReason,
+				&o.PaymentStatus, &o.PaymentUrl, &o.InvoiceUrl, &o.PiUrl, &o.DeclineReason,
 				&o.CreatedAt, &o.UpdatedAt, &o.UserName, &o.Deadline, &total,
 			); err != nil {
 				return nil, 0, err
@@ -382,7 +382,7 @@ func UpdateOrderPaymentScreenshot(orderID, screenshotURL, userID string) error {
 		    payment_status = 'payment_uploaded',
 		    updated_at = $2
 		WHERE order_id = $3
-	`, screenshotURL, utils.NowInIST(),orderID)
+	`, screenshotURL, utils.NowInIST(), orderID)
 	if err != nil {
 		return fmt.Errorf("failed to update order payment screenshot: %w", err)
 	}
@@ -390,7 +390,7 @@ func UpdateOrderPaymentScreenshot(orderID, screenshotURL, userID string) error {
 	_, err = tx.Exec(`
 		INSERT INTO order_status_history (order_id, status, changed_at, changed_by)
 		VALUES ($1, $2,$3, $4)
-	`, orderID, "payment_uploaded", utils.NowInIST(),userID)
+	`, orderID, "payment_uploaded", utils.NowInIST(), userID)
 	if err != nil {
 		return fmt.Errorf("failed to insert into order_status_history: %w", err)
 	}
@@ -418,13 +418,13 @@ func UpdateOrderInvoice(orderID string, urls map[string]string) error {
 	argIdx := 1
 
 	if invoiceURL, ok := urls["invoice_url"]; ok {
-		setParts = append(setParts, "invoice_url = $" + strconv.Itoa(argIdx))
+		setParts = append(setParts, "invoice_url = $"+strconv.Itoa(argIdx))
 		args = append(args, invoiceURL)
 		argIdx++
 	}
 
 	if piURL, ok := urls["pi_url"]; ok {
-		setParts = append(setParts, "pi_url = $" + strconv.Itoa(argIdx))
+		setParts = append(setParts, "pi_url = $"+strconv.Itoa(argIdx))
 		args = append(args, piURL)
 		argIdx++
 	}
@@ -454,15 +454,27 @@ func AddOrderComment(orderID, userID, role, comment string) error {
 	return err
 }
 
-func GetCommentsByOrder(orderID string) ([]OrderComment, error) {
-	rows, err := db.DB.Query(`
-        SELECT id, order_id, user_id, role, comment, created_at
-        FROM order_comments
-        WHERE order_id = $1
-        ORDER BY created_at ASC
-    `, orderID)
-	if err != nil {
-		return nil, err
+func GetCommentsByOrder(orderID, userID, role string) ([]OrderComment, error) {
+	query := `SELECT id, order_id, user_id, role, comment, created_at
+        FROM order_comments `
+
+	var rows *sql.Rows
+	var err error
+
+	switch role {
+	case "admin":
+		query += `Where order_id = $1`
+		rows, err = db.DB.Query(query, orderID)
+		if err != nil {
+			return nil, err
+		}
+	
+	case "printing", "plant":
+		query+= `Where order_id = $1 and user_id = $2`
+		rows, err = db.DB.Query(query,orderID,userID)
+		if err != nil {
+			return nil, err
+		}
 	}
 	defer rows.Close()
 
@@ -482,7 +494,7 @@ func AssignOrder(orderID, userID, role string, deadlineDays int) error {
 	_, err := db.DB.Exec(`
         INSERT INTO order_assignments (order_id, user_id, role, assigned_at, deadline)
         VALUES ($1, $2, $3,$4, $5)
-    `, orderID, userID, role, utils.NowInIST(),deadline)
+    `, orderID, userID, role, utils.NowInIST(), deadline)
 	return err
 }
 
@@ -529,11 +541,11 @@ func IsOrderAssignedToUser(orderID, userID, role string) (bool, error) {
 }
 
 func SaveOrderLabelDetails(details OrderLabelDetails) error {
-    if details.OrderID == "" {
-        return errors.New("order_id is required")
-    }
+	if details.OrderID == "" {
+		return errors.New("order_id is required")
+	}
 
-    _, err := db.DB.Exec(`
+	_, err := db.DB.Exec(`
         INSERT INTO order_label_details 
             (order_id, no_of_sheets, cutting_type, labels_per_sheet, description)
         VALUES ($1, $2, $3, $4, $5)
@@ -545,23 +557,23 @@ func SaveOrderLabelDetails(details OrderLabelDetails) error {
             updated_at = NOW()
     `, details.OrderID, details.NoOfSheets, details.CuttingType, details.LabelsPerSheet, details.Description)
 
-    return err
+	return err
 }
 
 func GetOrderLabelDetails(orderID string) (*OrderLabelDetails, error) {
-    row := db.DB.QueryRow(`
+	row := db.DB.QueryRow(`
         SELECT id, order_id, no_of_sheets, cutting_type, labels_per_sheet, description FROM order_label_details
         WHERE order_id = $1
     `, orderID)
 
-    var details OrderLabelDetails
-    err := row.Scan(&details.ID, &details.OrderID, &details.NoOfSheets, &details.CuttingType, 
-        &details.LabelsPerSheet, &details.Description)
-    if err == sql.ErrNoRows {
-        return nil, nil
-    } else if err != nil {
-        return nil, err
-    }
+	var details OrderLabelDetails
+	err := row.Scan(&details.ID, &details.OrderID, &details.NoOfSheets, &details.CuttingType,
+		&details.LabelsPerSheet, &details.Description)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
 
-    return &details, nil
+	return &details, nil
 }

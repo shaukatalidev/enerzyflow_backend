@@ -417,14 +417,14 @@ func AddOrderCommentService(orderID, userID, role, comment string) error {
 
 func GetOrderCommentsService(orderID, role, userID string) ([]OrderComment, error) {
 	if role == "admin" {	
-		return GetCommentsByOrder(orderID)
+		return GetCommentsByOrder(orderID,userID,role)
 	}
 	if isTrue, err:=  IsOrderAssignedToUser(orderID, userID, role); err != nil {
 		return nil, fmt.Errorf("failed to verify assignment: %v", err)
 	} else if !isTrue {
 		return nil, errors.New("you are not assigned to this order")
 	}
-	return GetCommentsByOrder(orderID)
+	return GetCommentsByOrder(orderID,userID,role)
 }
 
 func SaveOrderLabelDetailsService(orderID string, noOfSheets int, cuttingType string, labelsPerSheet int, description string) error {
@@ -482,7 +482,7 @@ func GetOrderDetailService(orderID, role, userID string) (*OrderDetailResponse, 
 		return nil, err
 	}
 
-	comments, err := GetCommentsByOrder(orderID)
+	comments, err := GetCommentsByOrder(orderID,userID,role)
 	if err != nil {
 		return nil, err
 	}
