@@ -103,7 +103,6 @@ func GetOrdersHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, orders)
 }
 
-
 func GetAllOrdersHandler(c *gin.Context) {
 	limitStr := c.DefaultQuery("limit", "10")
 	offsetStr := c.DefaultQuery("offset", "0")
@@ -131,7 +130,7 @@ func GetAllOrdersHandler(c *gin.Context) {
 		offset = 0
 	}
 
-	orders,total, err := GetAllOrdersService(role, limit, offset, userID.String())
+	orders, total, err := GetAllOrdersService(role, limit, offset, userID.String())
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -139,7 +138,7 @@ func GetAllOrdersHandler(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"orders": orders,
-		"count": total,
+		"count":  total,
 	})
 }
 
@@ -161,15 +160,15 @@ func UpdateOrderStatusHandler(c *gin.Context) {
 		c.JSON(401, gin.H{"error": "unauthenticated"})
 		return
 	}
-	userID, _ := userIDVal.(uuid.UUID) 
-	
+	userID, _ := userIDVal.(uuid.UUID)
+
 	role := c.GetString("role")
 	if role == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "user role missing in context"})
 		return
 	}
 
-	if err := UpdateOrderStatusService(userID.String(),role, orderID, req); err != nil {
+	if err := UpdateOrderStatusService(userID.String(), role, orderID, req); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
@@ -211,7 +210,7 @@ func UpdatePaymentStatusHandler(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid user context"})
 		return
 	}
-	
+
 	if err := UpdatePaymentStatusService(orderID, req.Status, req.Reason, userID.String()); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -245,20 +244,20 @@ func UploadPaymentScreenshotHandler(c *gin.Context) {
 		return
 	}
 
-	url, err := UploadPaymentScreenshotService(orderID, fileHeader,userID.String())
+	url, err := UploadPaymentScreenshotService(orderID, fileHeader, userID.String())
 	if err != nil {
-    switch err.Error() {
-    case "order not found":
-        c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-    case "file cannot be nil":
-        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-    case "unauthorized":
-        c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-    default:
-        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-    }
-    return
-}
+		switch err.Error() {
+		case "order not found":
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		case "file cannot be nil":
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		case "unauthorized":
+			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		}
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "payment screenshot uploaded successfully",
@@ -282,9 +281,9 @@ func GetOrderTrackingHandler(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid user context"})
 		return
 	}
-	role:= c.GetString("role")
+	role := c.GetString("role")
 
-	history, err := GetOrderTrackingService(orderID,userID.String(),role)
+	history, err := GetOrderTrackingService(orderID, userID.String(), role)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -301,7 +300,7 @@ func UploadInvoiceHandler(c *gin.Context) {
 	}
 
 	invoiceFile, _ := c.FormFile("invoice")
-	piFile, _ := c.FormFile("pi") 
+	piFile, _ := c.FormFile("pi")
 
 	if invoiceFile == nil && piFile == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "no file provided"})
@@ -314,49 +313,98 @@ func UploadInvoiceHandler(c *gin.Context) {
 		return
 	}
 
-
 	c.JSON(http.StatusOK, gin.H{
 		"message": "files uploaded successfully",
-		"urls":     urls,
+		"urls":    urls,
 	})
 }
 
 func AddOrderCommentHandler(c *gin.Context) {
-    orderID := c.Param("id")
-    var req struct {
-        Comment string `json:"comment"`
-    }
+	orderID := c.Param("id")
+	var req struct {
+		Comment string `json:"comment"`
+	}
 
-    if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
-        return
-    }
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+		return
+	}
 
-    userIDVal, exists := c.Get("user_id")
-    if !exists {
-        c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthenticated"})
-        return
-    }
-    userID := userIDVal.(uuid.UUID).String()
+	userIDVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthenticated"})
+		return
+	}
+	userID := userIDVal.(uuid.UUID).String()
 
-    role := c.GetString("role")
-    if err := AddOrderCommentService(orderID, userID, role, req.Comment); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-        return
-    }
+	role := c.GetString("role")
+	if err := AddOrderCommentService(orderID, userID, role, req.Comment); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
-    c.JSON(http.StatusOK, gin.H{"message": "comment added successfully"})
+	c.JSON(http.StatusOK, gin.H{"message": "comment added successfully"})
 }
 
 func GetOrderCommentsHandler(c *gin.Context) {
-    orderID := c.Param("id")
-    role := c.GetString("role")
+	orderID := c.Param("id")
+	role := c.GetString("role")
 
-    comments, err := GetOrderCommentsService(orderID, role)
-    if err != nil {
-        c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
-        return
-    }
+	comments, err := GetOrderCommentsService(orderID, role)
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
 
-    c.JSON(http.StatusOK, gin.H{"comments": comments})
+	c.JSON(http.StatusOK, gin.H{"comments": comments})
+}
+
+func SaveOrderLabelDetailsHandler(c *gin.Context) {
+	orderID := c.Param("id")
+	if orderID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "order_id is required"})
+		return
+	}
+
+	var req SaveLabelDetailsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := SaveOrderLabelDetailsService(orderID, req.NoOfSheets, req.CuttingType, req.LabelsPerSheet, req.Description); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "label details saved successfully"})
+}
+
+func GetOrderLabelDetailsHandler(c *gin.Context) {
+	orderID := c.Param("id")
+	if orderID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "order_id is required"})
+		return
+	}
+
+	role := c.GetString("role")
+	userIDVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthenticated"})
+		return
+	}
+	userID := userIDVal.(uuid.UUID).String()
+
+	details, err := GetOrderLabelDetailsService(orderID, userID, role)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if details == nil {
+		c.JSON(http.StatusNotFound, gin.H{"message": "no label details found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, details)
 }
