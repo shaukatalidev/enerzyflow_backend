@@ -79,11 +79,11 @@ func GetOrderService(userID, orderID string) (*OrderResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	if order.UserID != userID {
-		return nil, errors.New("unauthorized access to order")
-	}
 	if order == nil {
 		return nil, errors.New("order not found")
+	}
+	if order.UserID != userID {
+		return nil, errors.New("unauthorized access to order")
 	}
 
 	return &OrderResponse{
@@ -151,7 +151,7 @@ func GetOrdersService(userID string, limit, offset int) (*OrderListResponse, err
 }
 
 func GetAllOrdersService(role string, limit, offset int, userID string) ([]AllOrderModel, int, error) {
-	return GetAllOrders(limit, offset, role)
+	return GetAllOrders(limit, offset, role, userID)
 }
 
 func UpdateOrderStatusService(userID, role, orderID string, req UpdateOrderStatusRequest) error {
@@ -236,11 +236,11 @@ func UpdateOrderStatusService(userID, role, orderID string, req UpdateOrderStatu
 		switch order.Status {
 		case "ready_for_plant":
 			if err := AssignOrder(orderID, userID, "plant", 3); err != nil {
-					return err
-				}
+				return err
+			}
 			return UpdateOrderStatus(orderID, "plant_processing", userID, "")
 		case "plant_processing":
-			if err:= CompleteOrderAssignment(orderID,userID); err!= nil {
+			if err := CompleteOrderAssignment(orderID, userID); err != nil {
 				return err
 			}
 			return UpdateOrderStatus(orderID, "dispatched", userID, "")
@@ -400,13 +400,21 @@ func AddOrderCommentService(orderID, userID, role, comment string) error {
 		return errors.New("comment cannot be empty")
 	}
 
-	switch  role {
+	assigned, err := IsOrderAssignedToUser(orderID, userID, role)
+	if err != nil {
+		return fmt.Errorf("failed to verify assignment: %v", err)
+	}
+	if !assigned {
+		return errors.New("you are not assigned to this order")
+	}
+
+	switch role {
 	case "printing":
-		if order.Status != "printing"{
+		if order.Status != "printing" {
 			return errors.New("printing can only comment on orders in 'printing' status")
 		}
 	case "plant":
-		if order.Status != "plant_processing"{
+		if order.Status != "plant_processing" {
 			return errors.New("plant can only comment on orders in 'plant_processing' status")
 		}
 	default:

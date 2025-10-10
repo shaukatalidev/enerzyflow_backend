@@ -60,7 +60,6 @@ type AllOrderModel struct {
 	OrderID          string    `json:"order_id" db:"order_id"`
 	UserID           string    `json:"user_id"`
 	UserName         string    `json:"user_name" db:"user_name"`
-	CompanyID        string    `json:"company_id" db:"company_id"`
 	CompanyName      string    `json:"company_name" db:"company_name"`
 	LabelID          string    `json:"label_id" db:"label_id"`
 	LabelURL         string    `json:"label_url" db:"label_url"`
@@ -70,19 +69,12 @@ type AllOrderModel struct {
 	Volume           string    `json:"volume" db:"volume"`
 	Status           string    `json:"status,omitempty" db:"status"`
 	PaymentStatus    string    `json:"payment_status,omitempty"`
-	DeclineReason    string    `json:"decline_reason,omitempty"`
-	PaymentUrl       string    `json:"payment_url"`
+	DeclineReason    string    `json:"decline_reason"`
+	PaymentUrl       string    `json:"payment_url,omitempty"`
 	InvoiceUrl       string    `json:"invoice_url"`
 	ExpectedDelivery time.Time `json:"expected_delivery" db:"expected_delivery_date"`
 	CreatedAt        time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at" db:"updated_at"`
-
-	PrintingUserID       string    `json:"printing_user_id,omitempty"`
-	PrintingAssignedAt   time.Time `json:"printing_assigned_at,omitempty"`
-	PrintingCompletedAt  time.Time `json:"printing_completed_at,omitempty"`
-	PlantUserID          string    `json:"plant_user_id,omitempty"`
-	PlantAssignedAt      time.Time `json:"plant_assigned_at,omitempty"`
-	PlantCompletedAt     time.Time `json:"plant_completed_at,omitempty"`
 }
 
 type OrderStatusHistory struct {

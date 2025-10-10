@@ -6,8 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"time"
-
-	"github.com/lib/pq"
 )
 
 func CreateOrder(order *Order, userID string) error {
@@ -217,8 +215,8 @@ func GetOrderStatusHistory(orderID string) ([]OrderStatusHistory, error) {
 	return history, nil
 }
 
-func GetAllOrders(limit, offset int, role string) ([]AllOrderModel, int, error) {
-	query := `
+func GetAllOrders(limit, offset int, role, userID string) ([]AllOrderModel, int, error) {
+	baseQuery := `
 	SELECT 
 		o.order_id,
 		o.user_id,
@@ -250,18 +248,73 @@ func GetAllOrders(limit, offset int, role string) ([]AllOrderModel, int, error) 
 
 	switch role {
 	case "admin":
-		query += ` ORDER BY o.created_at DESC LIMIT $1 OFFSET $2`
+		query := baseQuery + ` ORDER BY o.created_at DESC LIMIT $1 OFFSET $2`
 		rows, err = db.DB.Query(query, limit, offset)
 
 	case "printing":
-		statuses := []string{"placed", "printing", "declined", "ready_for_plant", "plant_processing", "dispatched", "completed"}
-		query += ` WHERE o.payment_status = 'payment_verified' AND o.status = ANY($3) ORDER BY o.created_at DESC LIMIT $1 OFFSET $2`
-		rows, err = db.DB.Query(query, limit, offset, pq.Array(statuses))
+	query := `
+	SELECT 
+		o.order_id,
+		o.user_id,
+		c.name AS company_name,
+		o.label_id,
+		l.label_url,
+		o.variant,
+		o.qty,
+		o.cap_color,
+		o.volume,
+		o.status,
+		COALESCE(o.decline_reason, '') AS decline_reason,
+		o.created_at,
+		o.updated_at,
+		u.name AS user_name,
+		o.expected_delivery_date,
+		COUNT(*) OVER() AS total_count
+	FROM orders o
+	LEFT JOIN labels l ON o.label_id = l.label_id
+	INNER JOIN users u ON o.user_id = u.user_id
+	INNER JOIN companies c ON u.user_id = c.user_id
+	LEFT JOIN order_assignments oa ON o.order_id = oa.order_id AND oa.role = 'printing'
+	WHERE 
+		o.payment_status = 'payment_verified' AND
+		(
+			oa.user_id IS NULL OR oa.user_id = $3 OR (o.status = 'declined' AND oa.user_id = $3)
+		)
+		AND NOT (o.status = 'declined' AND oa.user_id IS DISTINCT FROM $3)
+	ORDER BY o.created_at DESC LIMIT $1 OFFSET $2
+	`
+	rows, err = db.DB.Query(query, limit, offset, userID)
 
-	case "plant":
-		statuses := []string{"ready_for_plant", "plant_processing", "dispatched", "completed"}
-		query += ` WHERE o.status = ANY($3) ORDER BY o.created_at DESC LIMIT $1 OFFSET $2`
-		rows, err = db.DB.Query(query, limit, offset, pq.Array(statuses))
+case "plant":
+	query := `
+	SELECT 
+		o.order_id,
+		o.user_id,
+		c.name AS company_name,
+		o.label_id,
+		l.label_url,
+		o.variant,
+		o.qty,
+		o.cap_color,
+		o.volume,
+		o.status,
+		COALESCE(o.decline_reason, '') AS decline_reason,
+		o.created_at,
+		o.updated_at,
+		u.name AS user_name,
+		o.expected_delivery_date,
+		COUNT(*) OVER() AS total_count
+	FROM orders o
+	LEFT JOIN labels l ON o.label_id = l.label_id
+	INNER JOIN users u ON o.user_id = u.user_id
+	INNER JOIN companies c ON u.user_id = c.user_id
+	LEFT JOIN order_assignments oa ON o.order_id = oa.order_id AND oa.role = 'plant'
+	WHERE 
+		o.status IN ('ready_for_plant', 'plant_processing', 'dispatched', 'completed')
+		AND (oa.user_id IS NULL OR oa.user_id = $3)
+	ORDER BY o.created_at DESC LIMIT $1 OFFSET $2
+	`
+	rows, err = db.DB.Query(query, limit, offset, userID)
 
 	default:
 		return nil, 0, fmt.Errorf("unauthorized role: %s", role)
@@ -272,19 +325,32 @@ func GetAllOrders(limit, offset int, role string) ([]AllOrderModel, int, error) 
 	}
 	defer rows.Close()
 
-	var (
-		orders []AllOrderModel
-		total  int
-	)
+	var orders []AllOrderModel
+	var total int
+
 	for rows.Next() {
 		var o AllOrderModel
-		if err := rows.Scan(
-			&o.OrderID, &o.UserID, &o.CompanyName, &o.LabelID, &o.LabelURL, &o.Variant, &o.Qty,
-			&o.CapColor, &o.Volume, &o.Status, &o.PaymentStatus, &o.PaymentUrl, &o.InvoiceUrl, &o.DeclineReason,
-			&o.CreatedAt, &o.UpdatedAt, &o.UserName, &o.ExpectedDelivery, &total,
-		); err != nil {
-			return nil, 0, err
+
+		if role == "admin" {
+			if err := rows.Scan(
+				&o.OrderID, &o.UserID, &o.CompanyName, &o.LabelID, &o.LabelURL,
+				&o.Variant, &o.Qty, &o.CapColor, &o.Volume, &o.Status,
+				&o.PaymentStatus, &o.PaymentUrl, &o.InvoiceUrl, &o.DeclineReason,
+				&o.CreatedAt, &o.UpdatedAt, &o.UserName, &o.ExpectedDelivery, &total,
+			); err != nil {
+				return nil, 0, err
+			}
+		} else {
+			if err := rows.Scan(
+				&o.OrderID, &o.UserID, &o.CompanyName, &o.LabelID, &o.LabelURL,
+				&o.Variant, &o.Qty, &o.CapColor, &o.Volume, &o.Status,
+				&o.DeclineReason, &o.CreatedAt, &o.UpdatedAt, &o.UserName,
+				&o.ExpectedDelivery, &total,
+			); err != nil {
+				return nil, 0, err
+			}
 		}
+
 		orders = append(orders, o)
 	}
 
@@ -405,6 +471,17 @@ func CompleteOrderAssignment(orderID, userID string) error {
         UPDATE order_assignments
         SET completed_at = $1
         WHERE order_id = $2
-    `, time.Now(),orderID)
+    `, time.Now(), orderID)
 	return err
+}
+
+func IsOrderAssignedToUser(orderID, userID, role string) (bool, error) {
+	var exists bool
+	err := db.DB.QueryRow(`
+		SELECT EXISTS(
+			SELECT 1 FROM order_assignments
+			WHERE order_id = $1 AND user_id = $2 AND role = $3
+		)
+	`, orderID, userID, role).Scan(&exists)
+	return exists, err
 }
