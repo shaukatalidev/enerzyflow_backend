@@ -495,6 +495,28 @@ func CompleteOrderAssignment(orderID, userID string) error {
 	return err
 }
 
+func GetOrderAssignments(orderID string) ([]OrderAssignment, error) {
+	rows, err := db.DB.Query(`
+		SELECT order_id, user_id, role, assigned_at, deadline, completed_at
+		FROM order_assignments
+		WHERE order_id = $1
+	`, orderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var assignments []OrderAssignment
+	for rows.Next() {
+		var a OrderAssignment
+		if err := rows.Scan(&a.OrderID, &a.UserID, &a.Role, &a.AssignedAt, &a.Deadline, &a.CompletedAt); err != nil {
+			return nil, err
+		}
+		assignments = append(assignments, a)
+	}
+	return assignments, nil
+}
+
 func IsOrderAssignedToUser(orderID, userID, role string) (bool, error) {
 	var exists bool
 	err := db.DB.QueryRow(`

@@ -462,3 +462,51 @@ func GetOrderLabelDetailsService(orderID,userID,role string) (*OrderLabelDetails
 	}
     
 }
+
+func GetOrderDetailService(orderID, role, userID string) (*OrderDetailResponse, error) {
+	order, err := GetOrderByID(orderID)
+	if err != nil {
+		return nil, err
+	}
+	if order == nil {
+		return nil, errors.New("order not found")
+	}
+
+	assignments, err := GetOrderAssignments(orderID)
+	if err != nil {
+		return nil, err
+	}
+
+	comments, err := GetCommentsByOrder(orderID)
+	if err != nil {
+		return nil, err
+	}
+
+	labelDetails, err := GetOrderLabelDetails(orderID)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &OrderDetailResponse{
+		OrderID:          order.OrderID,
+		UserID:           order.UserID,
+		LabelURL:         order.LabelURL,
+		Variant:          order.Variant,
+		Qty:              order.Qty,
+		CapColor:         order.CapColor,
+		Volume:           order.Volume,
+		Status:           order.Status,
+		PaymentStatus:    order.PaymentStatus,
+		PaymentUrl:       order.PaymentUrl,
+		InvoiceUrl:       order.InvoiceUrl,
+		PiUrl:            order.PiUrl,
+		DeclineReason:    order.DeclineReason,
+		CreatedAt:        order.CreatedAt,
+		UpdatedAt:        order.UpdatedAt,
+		ExpectedDelivery: order.ExpectedDelivery,
+		LabelDetails:     labelDetails,
+		Assignments:      assignments,
+		Comments:         comments,
+	}
+	return response, nil
+}

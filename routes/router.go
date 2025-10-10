@@ -45,6 +45,8 @@ func RegisterAllRoutes(r *gin.Engine) {
 
 		orderGroup.POST("/:id/label", utils.RoleMiddleware("admin"),orders.SaveOrderLabelDetailsHandler)
 		orderGroup.GET("/:id/label", orders.GetOrderLabelDetailsHandler)
+
+		orderGroup.GET("/:id/detail",utils.RoleMiddleware("admin"),orders.GetOrderDetailHandler)
 	}
 }
 

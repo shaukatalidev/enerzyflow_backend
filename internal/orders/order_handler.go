@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -407,4 +408,34 @@ func GetOrderLabelDetailsHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, details)
+}
+
+func GetOrderDetailHandler(c *gin.Context) {
+	orderID := c.Param("id")
+	if orderID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "order_id is required"})
+		return
+	}
+
+	role:= c.GetString("role")
+	userIDVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthenticated"})
+		return
+	}
+	userID := userIDVal.(uuid.UUID)
+
+	orderDetail, err := GetOrderDetailService(orderID, role, userID.String())
+	if err != nil {
+		if err.Error() == "order not found" || strings.Contains(err.Error(), "unauthorized") {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"order": orderDetail,
+	})
 }

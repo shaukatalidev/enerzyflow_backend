@@ -1,6 +1,9 @@
 package orders
 
-import "time"
+import (
+	"database/sql"
+	"time"
+)
 
 type Order struct {
 	OrderID          string    `json:"order_id"`
@@ -110,4 +113,36 @@ type SaveLabelDetailsRequest struct {
     CuttingType    string `json:"cutting_type" binding:"required"`
     LabelsPerSheet int    `json:"labels_per_sheet" binding:"required"`
     Description    string `json:"description"`
+}
+
+type OrderAssignment struct {
+    OrderID     string    `json:"order_id"`
+    UserID      string    `json:"user_id"`
+    Role        string    `json:"role"`
+    AssignedAt  time.Time `json:"assigned_at"`
+    Deadline    time.Time `json:"deadline"`
+    CompletedAt sql.NullTime `json:"completed_at"`
+}
+
+type OrderDetailResponse struct {
+	OrderID           string                 `json:"order_id"`
+	UserID            string                 `json:"user_id"`
+	LabelURL          string                 `json:"label_id"`
+	Variant           string                 `json:"variant"`
+	Qty               int                    `json:"qty"`
+	CapColor          string                 `json:"cap_color"`
+	Volume            int                    `json:"volume"`
+	Status            string                 `json:"status"`
+	PaymentStatus     string                 `json:"payment_status,omitempty"`
+	PaymentUrl        string                 `json:"payment_url,omitempty"`
+	InvoiceUrl        string                 `json:"invoice_url,omitempty"`
+	PiUrl             string                 `json:"pi_url,omitempty"`
+	DeclineReason     string                 `json:"decline_reason,omitempty"`
+	CreatedAt         time.Time              `json:"created_at"`
+	UpdatedAt         time.Time              `json:"updated_at"`
+	UserName          string                 `json:"user_name"`
+	ExpectedDelivery  time.Time              `json:"expected_delivery"`
+	LabelDetails      *OrderLabelDetails     `json:"label_details,omitempty"`
+	Assignments       []OrderAssignment      `json:"assignments,omitempty"`
+	Comments          []OrderComment        `json:"comments,omitempty"`
 }
