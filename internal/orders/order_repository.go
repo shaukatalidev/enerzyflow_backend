@@ -3,6 +3,7 @@ package orders
 import (
 	"database/sql"
 	"enerzyflow_backend/internal/db"
+	"enerzyflow_backend/utils"
 	"errors"
 	"fmt"
 	"strconv"
@@ -137,15 +138,15 @@ func UpdateOrderStatus(orderID, status, changedBy, reason string) error {
 	if status == "declined" {
 		_, err = tx.Exec(`
 		UPDATE orders 
-		SET status = $1, decline_reason = $2, updated_at = NOW()
-		WHERE order_id = $3
-	`, status, reason, orderID)
+		SET status = $1, decline_reason = $2, updated_at = $3
+		WHERE order_id = $4
+	`, status, reason, utils.NowInIST(),orderID)
 	} else {
 		_, err = tx.Exec(`
 		UPDATE orders 
-		SET status = $1, updated_at = NOW()
-		WHERE order_id = $2
-	`, status, orderID)
+		SET status = $1, updated_at = $2
+		WHERE order_id = $3
+	`, status, utils.NowInIST(),orderID)
 		if err != nil {
 			return err
 		}
@@ -153,8 +154,8 @@ func UpdateOrderStatus(orderID, status, changedBy, reason string) error {
 
 	_, err = tx.Exec(`
 		INSERT INTO order_status_history (order_id, status, changed_at, changed_by, reason)
-		VALUES ($1, $2, NOW(), $3, $4)
-	`, orderID, status, changedBy, reason)
+		VALUES ($1, $2, $3, $4, $5)
+	`, orderID, status, utils.NowInIST(),changedBy, reason)
 	if err != nil {
 		return err
 	}
@@ -176,21 +177,20 @@ func UpdatePaymentStatus(orderID, paymentStatus, changedBy, reason string) error
 	_, err = tx.Exec(`
 		UPDATE orders
 		SET payment_status = $1,
-		    updated_at = NOW()
-		WHERE order_id = $2
-	`, paymentStatus, orderID)
+		    updated_at = $2
+		WHERE order_id = $3
+	`, paymentStatus, utils.NowInIST(),orderID)
 	if err != nil {
 		return err
 	}
 
 	_, err = tx.Exec(`
 		INSERT INTO order_status_history (order_id, status, changed_at, changed_by, reason)
-		VALUES ($1, $2, NOW(), $3, $4)
-	`, orderID, paymentStatus, changedBy, reason)
+		VALUES ($1, $2, $3, $4, $5)
+	`, orderID, paymentStatus, utils.NowInIST(),changedBy, reason)
 	if err != nil {
 		return err
 	}
-
 	return tx.Commit()
 }
 
@@ -380,17 +380,17 @@ func UpdateOrderPaymentScreenshot(orderID, screenshotURL, userID string) error {
 		UPDATE orders
 		SET payment_screenshot_url = $1,
 		    payment_status = 'payment_uploaded',
-		    updated_at = NOW()
-		WHERE order_id = $2
-	`, screenshotURL, orderID)
+		    updated_at = $2
+		WHERE order_id = $3
+	`, screenshotURL, utils.NowInIST(),orderID)
 	if err != nil {
 		return fmt.Errorf("failed to update order payment screenshot: %w", err)
 	}
 
 	_, err = tx.Exec(`
 		INSERT INTO order_status_history (order_id, status, changed_at, changed_by)
-		VALUES ($1, $2, NOW(), $3)
-	`, orderID, "payment_uploaded", userID)
+		VALUES ($1, $2,$3, $4)
+	`, orderID, "payment_uploaded", utils.NowInIST(),userID)
 	if err != nil {
 		return fmt.Errorf("failed to insert into order_status_history: %w", err)
 	}
@@ -449,7 +449,7 @@ func AddOrderComment(orderID, userID, role, comment string) error {
 	_, err := db.DB.Exec(`
         INSERT INTO order_comments (order_id, user_id, role, comment, created_at)
         VALUES ($1, $2, $3, $4, $5)
-    `, orderID, userID, role, comment, time.Now())
+    `, orderID, userID, role, comment, utils.NowInIST())
 
 	return err
 }
@@ -478,11 +478,11 @@ func GetCommentsByOrder(orderID string) ([]OrderComment, error) {
 }
 
 func AssignOrder(orderID, userID, role string, deadlineDays int) error {
-	deadline := time.Now().Add(time.Duration(deadlineDays*24) * time.Hour)
+	deadline := utils.NowInIST().Add(time.Duration(deadlineDays*24) * time.Hour)
 	_, err := db.DB.Exec(`
         INSERT INTO order_assignments (order_id, user_id, role, assigned_at, deadline)
-        VALUES ($1, $2, $3, NOW(), $4)
-    `, orderID, userID, role, deadline)
+        VALUES ($1, $2, $3,$4, $5)
+    `, orderID, userID, role, utils.NowInIST(),deadline)
 	return err
 }
 
@@ -491,7 +491,7 @@ func CompleteOrderAssignment(orderID, userID string) error {
         UPDATE order_assignments
         SET completed_at = $1
         WHERE order_id = $2
-    `, time.Now(), orderID)
+    `, utils.NowInIST(), orderID)
 	return err
 }
 

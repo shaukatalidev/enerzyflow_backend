@@ -46,9 +46,9 @@ func CreateOrderService(userID string, req CreateOrderRequest) (*OrderResponse, 
 		CapColor:         req.CapColor,
 		Volume:           req.Volume,
 		Status:           "placed",
-		ExpectedDelivery: time.Now().Add(10 * 24 * time.Hour),
-		CreatedAt:        time.Now(),
-		UpdatedAt:        time.Now(),
+		ExpectedDelivery: utils.NowInIST().Add(10 * 24 * time.Hour),
+		CreatedAt:        utils.NowInIST(),
+		UpdatedAt:        utils.NowInIST(),
 	}
 
 	if err := CreateOrder(order, userID); err != nil {
@@ -66,8 +66,8 @@ func CreateOrderService(userID string, req CreateOrderRequest) (*OrderResponse, 
 		Status:           "placed",
 		PaymentStatus:    "payment_pending",
 		ExpectedDelivery: order.ExpectedDelivery,
-		CreatedAt:        time.Now(),
-		UpdatedAt:        time.Now(),
+		CreatedAt:        order.CreatedAt,
+		UpdatedAt:        order.UpdatedAt,
 	}, nil
 }
 

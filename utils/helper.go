@@ -5,6 +5,7 @@ import (
 	"errors"
 	"mime/multipart"
 	"os"
+	"time"
 
 	"github.com/cloudinary/cloudinary-go/v2"
 	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
@@ -40,4 +41,9 @@ func UploadFileToCloud(file *multipart.FileHeader, folder, publicID string) (str
 	}
 
 	return uploadResult.SecureURL, nil
+}
+
+func NowInIST() time.Time {
+	ist := time.FixedZone("IST", 5*60*60+30*60)
+	return time.Now().In(ist)
 }
