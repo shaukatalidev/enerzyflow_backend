@@ -110,6 +110,17 @@ func GetAllOrdersHandler(c *gin.Context) {
 
 	role := c.GetString("role")
 
+	userIDVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthenticated"})
+		return
+	}
+	userID, ok := userIDVal.(uuid.UUID)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid user context"})
+		return
+	}
+
 	limit, err := strconv.Atoi(limitStr)
 	if err != nil || limit <= 0 {
 		limit = 10
@@ -120,7 +131,7 @@ func GetAllOrdersHandler(c *gin.Context) {
 		offset = 0
 	}
 
-	orders,total, err := GetAllOrdersService(role, limit, offset)
+	orders,total, err := GetAllOrdersService(role, limit, offset, userID.String())
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -236,9 +247,18 @@ func UploadPaymentScreenshotHandler(c *gin.Context) {
 
 	url, err := UploadPaymentScreenshotService(orderID, fileHeader,userID.String())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "upload failed: " + err.Error()})
-		return
-	}
+    switch err.Error() {
+    case "order not found":
+        c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+    case "file cannot be nil":
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+    case "unauthorized":
+        c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+    default:
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+    }
+    return
+}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "payment screenshot uploaded successfully",
@@ -296,4 +316,44 @@ func UploadInvoiceHandler(c *gin.Context) {
 		"message": "invoice uploaded successfully",
 		"url":     url,
 	})
+}
+
+func AddOrderCommentHandler(c *gin.Context) {
+    orderID := c.Param("id")
+    var req struct {
+        Comment string `json:"comment"`
+    }
+
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+        return
+    }
+
+    userIDVal, exists := c.Get("user_id")
+    if !exists {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthenticated"})
+        return
+    }
+    userID := userIDVal.(uuid.UUID).String()
+
+    role := c.GetString("role")
+    if err := AddOrderCommentService(orderID, userID, role, req.Comment); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"message": "comment added successfully"})
+}
+
+func GetOrderCommentsHandler(c *gin.Context) {
+    orderID := c.Param("id")
+    role := c.GetString("role")
+
+    comments, err := GetOrderCommentsService(orderID, role)
+    if err != nil {
+        c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"comments": comments})
 }

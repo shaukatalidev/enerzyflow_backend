@@ -45,7 +45,7 @@ func CreateOrderService(userID string, req CreateOrderRequest) (*OrderResponse, 
 		CapColor:         req.CapColor,
 		Volume:           req.Volume,
 		Status:           "placed",
-		ExpectedDelivery: time.Now().Add(5 * 24 * time.Hour),
+		ExpectedDelivery: time.Now().Add(10 * 24 * time.Hour),
 		CreatedAt:        time.Now(),
 		UpdatedAt:        time.Now(),
 	}
@@ -118,7 +118,7 @@ func GetOrdersService(userID string, limit, offset int) (*OrderListResponse, err
 		return nil, errors.New("company not found for user")
 	}
 
-	orders,total, err := GetOrdersByUserID(userID, limit, offset)
+	orders, total, err := GetOrdersByUserID(userID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +150,7 @@ func GetOrdersService(userID string, limit, offset int) (*OrderListResponse, err
 	}, nil
 }
 
-func GetAllOrdersService(role string, limit, offset int) ([]AllOrderModel,int, error) {
+func GetAllOrdersService(role string, limit, offset int, userID string) ([]AllOrderModel, int, error) {
 	return GetAllOrders(limit, offset, role)
 }
 
@@ -178,7 +178,6 @@ func UpdateOrderStatusService(userID, role, orderID string, req UpdateOrderStatu
 		if !validStatuses[req.Status] {
 			return fmt.Errorf("invalid status '%s' for admin", req.Status)
 		}
-		fmt.Println("Reason", req.Reason)
 		if req.Status == "declined" {
 			reason := strings.TrimSpace(req.Reason)
 			reason = strings.Trim(reason, `"`)
@@ -203,6 +202,10 @@ func UpdateOrderStatusService(userID, role, orderID string, req UpdateOrderStatu
 		case "placed":
 			switch req.Status {
 			case "accepted":
+				if err := AssignOrder(orderID, userID, "printing", 2); err != nil {
+					return err
+				}
+
 				return UpdateOrderStatus(orderID, "printing", userID, "")
 			case "declined":
 				if req.Reason == "" {
@@ -214,8 +217,16 @@ func UpdateOrderStatusService(userID, role, orderID string, req UpdateOrderStatu
 			}
 		case "printing":
 			if req.Status == "ready_for_plant" {
-				return UpdateOrderStatus(orderID, "ready_for_plant", userID, "")
+				if err := UpdateOrderStatus(orderID, "ready_for_plant", userID, ""); err != nil {
+					return err
+				}
+
+				if err := CompleteOrderAssignment(orderID, userID); err != nil {
+					return err
+				}
+				return nil
 			}
+
 			return errors.New("invalid status update from printing")
 		default:
 			return errors.New("printing cannot handle this status")
@@ -224,8 +235,14 @@ func UpdateOrderStatusService(userID, role, orderID string, req UpdateOrderStatu
 	case "plant":
 		switch order.Status {
 		case "ready_for_plant":
+			if err := AssignOrder(orderID, userID, "plant", 3); err != nil {
+					return err
+				}
 			return UpdateOrderStatus(orderID, "plant_processing", userID, "")
 		case "plant_processing":
+			if err:= CompleteOrderAssignment(orderID,userID); err!= nil {
+				return err
+			}
 			return UpdateOrderStatus(orderID, "dispatched", userID, "")
 		default:
 			return errors.New("plant can only handle 'ready_for_plant' or 'plant_processing' statuses")
@@ -282,6 +299,17 @@ func GetOrderTrackingService(orderID, userID, role string) ([]OrderStatusHistory
 }
 
 func UploadPaymentScreenshotService(orderID string, fileHeader *multipart.FileHeader, userID string) (string, error) {
+	order, err := GetOrderByID(orderID)
+	if err != nil {
+		return "", err
+	}
+	if order == nil {
+		return "", errors.New("order not found")
+	}
+	if order.UserID != userID {
+		return "", errors.New("unauthorized")
+	}
+
 	if fileHeader == nil {
 		return "", errors.New("file cannot be nil")
 	}
@@ -358,4 +386,39 @@ func UploadInvoiceService(orderID string, file *multipart.FileHeader) (string, e
 	}
 
 	return uploadResult.SecureURL, nil
+}
+
+func AddOrderCommentService(orderID, userID, role, comment string) error {
+	order, err := GetOrderByID(orderID)
+	if err != nil {
+		return err
+	}
+	if order == nil {
+		return errors.New("order not found")
+	}
+	if comment == "" {
+		return errors.New("comment cannot be empty")
+	}
+
+	switch  role {
+	case "printing":
+		if order.Status != "printing"{
+			return errors.New("printing can only comment on orders in 'printing' status")
+		}
+	case "plant":
+		if order.Status != "plant_processing"{
+			return errors.New("plant can only comment on orders in 'plant_processing' status")
+		}
+	default:
+		return errors.New("unauthorized role")
+	}
+
+	return AddOrderComment(orderID, userID, role, comment)
+}
+
+func GetOrderCommentsService(orderID string, role string) ([]OrderComment, error) {
+	if role != "admin" {
+		return nil, errors.New("unauthorized: only admin can view comments")
+	}
+	return GetCommentsByOrder(orderID)
 }

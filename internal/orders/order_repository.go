@@ -5,6 +5,7 @@ import (
 	"enerzyflow_backend/internal/db"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/lib/pq"
 )
@@ -216,7 +217,7 @@ func GetOrderStatusHistory(orderID string) ([]OrderStatusHistory, error) {
 	return history, nil
 }
 
-func GetAllOrders(limit, offset int, role string) ([]AllOrderModel,int, error) {
+func GetAllOrders(limit, offset int, role string) ([]AllOrderModel, int, error) {
 	query := `
 	SELECT 
 		o.order_id,
@@ -263,30 +264,31 @@ func GetAllOrders(limit, offset int, role string) ([]AllOrderModel,int, error) {
 		rows, err = db.DB.Query(query, limit, offset, pq.Array(statuses))
 
 	default:
-		return nil,0, fmt.Errorf("unauthorized role: %s", role)
+		return nil, 0, fmt.Errorf("unauthorized role: %s", role)
 	}
 
 	if err != nil {
-		return nil,0, err
+		return nil, 0, err
 	}
 	defer rows.Close()
 
-	var( orders []AllOrderModel
-		total int
+	var (
+		orders []AllOrderModel
+		total  int
 	)
 	for rows.Next() {
 		var o AllOrderModel
 		if err := rows.Scan(
 			&o.OrderID, &o.UserID, &o.CompanyName, &o.LabelID, &o.LabelURL, &o.Variant, &o.Qty,
 			&o.CapColor, &o.Volume, &o.Status, &o.PaymentStatus, &o.PaymentUrl, &o.InvoiceUrl, &o.DeclineReason,
-			&o.CreatedAt, &o.UpdatedAt, &o.UserName, &o.ExpectedDelivery,&total,
+			&o.CreatedAt, &o.UpdatedAt, &o.UserName, &o.ExpectedDelivery, &total,
 		); err != nil {
-			return nil,0, err
+			return nil, 0, err
 		}
 		orders = append(orders, o)
 	}
 
-	return orders,total, nil
+	return orders, total, nil
 }
 
 func UpdateOrderPaymentScreenshot(orderID, screenshotURL, userID string) error {
@@ -355,4 +357,54 @@ func UpdateOrderInvoice(orderID, invoiceURL string) error {
 	}
 
 	return nil
+}
+
+func AddOrderComment(orderID, userID, role, comment string) error {
+	_, err := db.DB.Exec(`
+        INSERT INTO order_comments (order_id, user_id, role, comment, created_at)
+        VALUES ($1, $2, $3, $4, $5)
+    `, orderID, userID, role, comment, time.Now())
+
+	return err
+}
+
+func GetCommentsByOrder(orderID string) ([]OrderComment, error) {
+	rows, err := db.DB.Query(`
+        SELECT id, order_id, user_id, role, comment, created_at
+        FROM order_comments
+        WHERE order_id = $1
+        ORDER BY created_at ASC
+    `, orderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var comments []OrderComment
+	for rows.Next() {
+		var c OrderComment
+		if err := rows.Scan(&c.ID, &c.OrderID, &c.UserID, &c.Role, &c.Comment, &c.CreatedAt); err != nil {
+			return nil, err
+		}
+		comments = append(comments, c)
+	}
+	return comments, nil
+}
+
+func AssignOrder(orderID, userID, role string, deadlineDays int) error {
+	deadline := time.Now().Add(time.Duration(deadlineDays*24) * time.Hour)
+	_, err := db.DB.Exec(`
+        INSERT INTO order_assignments (order_id, user_id, role, assigned_at, deadline)
+        VALUES ($1, $2, $3, NOW(), $4)
+    `, orderID, userID, role, deadline)
+	return err
+}
+
+func CompleteOrderAssignment(orderID, userID string) error {
+	_, err := db.DB.Exec(`
+        UPDATE order_assignments
+        SET completed_at = $1
+        WHERE order_id = $2
+    `, time.Now(),orderID)
+	return err
 }
