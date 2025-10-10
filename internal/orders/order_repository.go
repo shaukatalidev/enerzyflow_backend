@@ -5,6 +5,8 @@ import (
 	"enerzyflow_backend/internal/db"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -60,7 +62,7 @@ func GetOrdersByUserID(userID string, limit, offset int) ([]OrderResponse, int, 
 	rows, err := db.DB.Query(`
         SELECT o.order_id, o.user_id, l.label_url AS label_url, 
             o.variant, o.qty, o.cap_color, o.volume, 
-            o.status,o.payment_status,o.decline_reason,o.payment_screenshot_url,o.invoice_url,o.created_at, o.updated_at, o.expected_delivery_date,COUNT(*) OVER() AS total_count
+            o.status,o.payment_status,o.decline_reason,o.payment_screenshot_url,o.invoice_url,o.pi_url,o.created_at, o.updated_at, o.expected_delivery_date,COUNT(*) OVER() AS total_count
         FROM orders o
         LEFT JOIN labels l ON o.label_id = l.label_id
         WHERE o.user_id = $1 
@@ -79,7 +81,7 @@ func GetOrdersByUserID(userID string, limit, offset int) ([]OrderResponse, int, 
 	for rows.Next() {
 		var order OrderResponse
 		err := rows.Scan(&order.OrderID, &order.UserID, &order.LabelURL, &order.Variant,
-			&order.Qty, &order.CapColor, &order.Volume, &order.Status, &order.PaymentStatus, &order.DeclineReason, &order.PaymentUrl, &order.InvoiceUrl, &order.CreatedAt, &order.UpdatedAt, &order.ExpectedDelivery, &total)
+			&order.Qty, &order.CapColor, &order.Volume, &order.Status, &order.PaymentStatus, &order.DeclineReason, &order.PaymentUrl, &order.InvoiceUrl,&order.PiUrl, &order.CreatedAt, &order.UpdatedAt, &order.ExpectedDelivery, &total)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -103,14 +105,14 @@ func GetOrderByID(orderID string) (*OrderResponse, error) {
 	row := db.DB.QueryRow(`
         SELECT o.order_id, o.user_id, l.label_url AS label_url, 
                o.variant, o.qty, o.cap_color, o.volume, 
-               o.status,o.payment_status,o.decline_reason,o.payment_screenshot_url,o.invoice_url,o.created_at, o.updated_at, o.expected_delivery_date
+               o.status,o.payment_status,o.decline_reason,o.payment_screenshot_url,o.invoice_url,o.pi_url,o.created_at, o.updated_at, o.expected_delivery_date
         FROM orders o
         LEFT JOIN labels l ON o.label_id = l.label_id
         WHERE o.order_id = $1 `, orderID)
 
 	order := &OrderResponse{}
 	err := row.Scan(&order.OrderID, &order.UserID, &order.LabelURL, &order.Variant,
-		&order.Qty, &order.CapColor, &order.Volume, &order.Status, &order.PaymentStatus, &order.DeclineReason, &order.PaymentUrl, &order.InvoiceUrl, &order.CreatedAt, &order.UpdatedAt, &order.ExpectedDelivery)
+		&order.Qty, &order.CapColor, &order.Volume, &order.Status, &order.PaymentStatus, &order.DeclineReason, &order.PaymentUrl, &order.InvoiceUrl, &order.PiUrl,&order.CreatedAt, &order.UpdatedAt, &order.ExpectedDelivery)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -231,6 +233,7 @@ func GetAllOrders(limit, offset int, role, userID string) ([]AllOrderModel, int,
 		o.payment_status,
 		o.payment_screenshot_url,
 		o.invoice_url,
+		o.pi_url,
 		COALESCE(o.decline_reason, '') AS decline_reason,
 		o.created_at,
 		o.updated_at,
@@ -335,7 +338,7 @@ case "plant":
 			if err := rows.Scan(
 				&o.OrderID, &o.UserID, &o.CompanyName, &o.LabelID, &o.LabelURL,
 				&o.Variant, &o.Qty, &o.CapColor, &o.Volume, &o.Status,
-				&o.PaymentStatus, &o.PaymentUrl, &o.InvoiceUrl, &o.DeclineReason,
+				&o.PaymentStatus, &o.PaymentUrl, &o.InvoiceUrl, &o.PiUrl,&o.DeclineReason,
 				&o.CreatedAt, &o.UpdatedAt, &o.UserName, &o.ExpectedDelivery, &total,
 			); err != nil {
 				return nil, 0, err
@@ -398,11 +401,7 @@ func UpdateOrderPaymentScreenshot(orderID, screenshotURL, userID string) error {
 	return nil
 }
 
-func UpdateOrderInvoice(orderID, invoiceURL string) error {
-	if orderID == "" || invoiceURL == "" {
-		return errors.New("orderID and screenshotURL cannot be empty")
-	}
-
+func UpdateOrderInvoice(orderID string, urls map[string]string) error {
 	tx, err := db.DB.Begin()
 	if err != nil {
 		return err
@@ -413,16 +412,36 @@ func UpdateOrderInvoice(orderID, invoiceURL string) error {
 		}
 	}()
 
-	_, err = tx.Exec(`UPDATE orders SET invoice_url = $1, updated_at = NOW() WHERE order_id = $2`, invoiceURL, orderID)
-	if err != nil {
-		return fmt.Errorf("failed to update order invoice: %w", err)
+	setParts := []string{}
+	args := []interface{}{}
+	argIdx := 1
+
+	if invoiceURL, ok := urls["invoice_url"]; ok {
+		setParts = append(setParts, "invoice_url = $" + strconv.Itoa(argIdx))
+		args = append(args, invoiceURL)
+		argIdx++
 	}
 
-	if err = tx.Commit(); err != nil {
-		return err
+	if piURL, ok := urls["pi_url"]; ok {
+		setParts = append(setParts, "pi_url = $" + strconv.Itoa(argIdx))
+		args = append(args, piURL)
+		argIdx++
 	}
 
-	return nil
+	if len(setParts) == 0 {
+		return errors.New("no URLs to update")
+	}
+
+	setParts = append(setParts, "updated_at = NOW()")
+
+	query := "UPDATE orders SET " + strings.Join(setParts, ", ") + " WHERE order_id = $" + strconv.Itoa(argIdx)
+	args = append(args, orderID)
+
+	if _, err := tx.Exec(query, args...); err != nil {
+		return fmt.Errorf("failed to update order: %w", err)
+	}
+
+	return tx.Commit()
 }
 
 func AddOrderComment(orderID, userID, role, comment string) error {

@@ -300,21 +300,24 @@ func UploadInvoiceHandler(c *gin.Context) {
 		return
 	}
 
-	fileHeader, err := c.FormFile("invoice")
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to get file: " + err.Error()})
+	invoiceFile, _ := c.FormFile("invoice")
+	piFile, _ := c.FormFile("pi") 
+
+	if invoiceFile == nil && piFile == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "no file provided"})
 		return
 	}
 
-	url, err := UploadInvoiceService(orderID, fileHeader)
+	urls, err := UploadInvoiceService(orderID, invoiceFile, piFile)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+
 	c.JSON(http.StatusOK, gin.H{
-		"message": "invoice uploaded successfully",
-		"url":     url,
+		"message": "files uploaded successfully",
+		"urls":     urls,
 	})
 }
 

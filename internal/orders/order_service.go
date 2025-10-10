@@ -3,6 +3,7 @@ package orders
 import (
 	"context"
 	"enerzyflow_backend/internal/companies"
+	"enerzyflow_backend/utils"
 	"errors"
 	"fmt"
 	"mime/multipart"
@@ -344,48 +345,37 @@ func UploadPaymentScreenshotService(orderID string, fileHeader *multipart.FileHe
 	return uploadResult.SecureURL, nil
 }
 
-func UploadInvoiceService(orderID string, file *multipart.FileHeader) (string, error) {
-	if file == nil {
-		return "", errors.New("no file provided")
-	}
-
+func UploadInvoiceService(orderID string, invoiceFile,piFile *multipart.FileHeader) (map[string]string, error) {
 	order, err := GetOrderByID(orderID)
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch order: %w", err)
+		return nil, fmt.Errorf("failed to fetch order: %w", err)
 	}
 	if order == nil {
-		return "", errors.New("order not found")
+		return nil, errors.New("order not found")
 	}
 
-	cld, err := cloudinary.NewFromParams(
-		os.Getenv("CLOUDINARY_CLOUD_NAME"),
-		os.Getenv("CLOUDINARY_API_KEY"),
-		os.Getenv("CLOUDINARY_API_SECRET"),
-	)
-	if err != nil {
-		return "", err
+	resutl := map[string]string{}
+
+	if invoiceFile != nil {
+		invoiceURL, err := utils.UploadFileToCloud(invoiceFile, "invoices", "invoice_"+orderID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to upload invoice: %w", err)
+		}
+		resutl["invoice_url"] = invoiceURL
+	}
+	if piFile != nil {
+		piURL, err := utils.UploadFileToCloud(piFile, "pi", "pi_"+orderID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to upload pi: %w", err)
+		}
+		resutl["pi_url"] = piURL
 	}
 
-	src, err := file.Open()
-	if err != nil {
-		return "", err
-	}
-	defer src.Close()
-
-	uploadResult, err := cld.Upload.Upload(context.Background(), src, uploader.UploadParams{
-		Folder:       "enerzyflow/invoices",
-		ResourceType: "raw",
-		PublicID:     "invoice_" + orderID,
-	})
-	if err != nil {
-		return "", err
+	if err := UpdateOrderInvoice(orderID, resutl); err != nil {
+			return nil, fmt.Errorf("failed to update order: %w", err)
 	}
 
-	if err := UpdateOrderInvoice(orderID, uploadResult.SecureURL); err != nil {
-		return "", err
-	}
-
-	return uploadResult.SecureURL, nil
+	return resutl, nil
 }
 
 func AddOrderCommentService(orderID, userID, role, comment string) error {
