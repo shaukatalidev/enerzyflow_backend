@@ -139,6 +139,7 @@ func GetOrdersService(userID string, limit, offset int) (*OrderListResponse, err
 			DeclineReason:    order.DeclineReason,
 			PaymentUrl:       order.PaymentUrl,
 			InvoiceUrl:       order.InvoiceUrl,
+			PiUrl:            order.PiUrl,
 			ExpectedDelivery: order.ExpectedDelivery,
 			CreatedAt:        order.CreatedAt,
 			UpdatedAt:        order.UpdatedAt,
@@ -419,4 +420,45 @@ func GetOrderCommentsService(orderID string, role string) ([]OrderComment, error
 		return nil, errors.New("unauthorized: only admin can view comments")
 	}
 	return GetCommentsByOrder(orderID)
+}
+
+func SaveOrderLabelDetailsService(orderID string, noOfSheets int, cuttingType string, labelsPerSheet int, description string) error {
+    order, err := GetOrderByID(orderID)
+    if err != nil {
+        return err
+    }
+    if order == nil {
+        return errors.New("order not found")
+    }
+
+    details := OrderLabelDetails{
+        OrderID:        orderID,
+        NoOfSheets:     noOfSheets,
+        CuttingType:    cuttingType,
+        LabelsPerSheet: labelsPerSheet,
+        Description:    description,
+    }
+
+    return SaveOrderLabelDetails(details)
+}
+
+func GetOrderLabelDetailsService(orderID,userID,role string) (*OrderLabelDetails, error) {
+	switch role {
+	case "admin":
+		return GetOrderLabelDetails(orderID)
+
+	case "printing":
+		assigned, err := IsOrderAssignedToUser(orderID, userID, role)
+		if err != nil {
+			return nil, fmt.Errorf("failed to verify assignment: %v", err)
+		}
+		if !assigned {
+			return nil, errors.New("you are not assigned to this order")
+		}
+		return GetOrderLabelDetails(orderID)
+
+	default:
+		return nil, errors.New("unauthorized role")
+	}
+    
 }

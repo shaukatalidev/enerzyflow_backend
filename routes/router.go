@@ -42,6 +42,9 @@ func RegisterAllRoutes(r *gin.Engine) {
 
 		orderGroup.POST("/:id/comment",orders.AddOrderCommentHandler)
 		orderGroup.GET("/:id/comment",orders.GetOrderCommentsHandler)
+
+		orderGroup.POST("/:id/label", utils.RoleMiddleware("admin"),orders.SaveOrderLabelDetailsHandler)
+		orderGroup.GET("/:id/label", orders.GetOrderLabelDetailsHandler)
 	}
 }
 

@@ -95,3 +95,19 @@ type OrderComment struct {
 	Comment   string    `json:"comment"`
 	CreatedAt time.Time `json:"created_at"`
 }
+
+type OrderLabelDetails struct {
+    ID             int       `json:"id"`
+    OrderID        string    `json:"order_id"`
+    NoOfSheets     int       `json:"no_of_sheets"`
+    CuttingType    string    `json:"cutting_type"`
+    LabelsPerSheet int       `json:"labels_per_sheet"`
+    Description    string    `json:"description"`
+}
+
+type SaveLabelDetailsRequest struct {
+    NoOfSheets     int    `json:"no_of_sheets" binding:"required"`
+    CuttingType    string `json:"cutting_type" binding:"required"`
+    LabelsPerSheet int    `json:"labels_per_sheet" binding:"required"`
+    Description    string `json:"description"`
+}

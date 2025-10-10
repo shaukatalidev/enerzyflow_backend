@@ -278,6 +278,7 @@ func GetAllOrders(limit, offset int, role, userID string) ([]AllOrderModel, int,
 	INNER JOIN users u ON o.user_id = u.user_id
 	INNER JOIN companies c ON u.user_id = c.user_id
 	LEFT JOIN order_assignments oa ON o.order_id = oa.order_id AND oa.role = 'printing'
+	INNER JOIN order_label_details ld ON o.order_id = ld.order_id
 	WHERE 
 		o.payment_status = 'payment_verified' AND
 		(
@@ -503,4 +504,42 @@ func IsOrderAssignedToUser(orderID, userID, role string) (bool, error) {
 		)
 	`, orderID, userID, role).Scan(&exists)
 	return exists, err
+}
+
+func SaveOrderLabelDetails(details OrderLabelDetails) error {
+    if details.OrderID == "" {
+        return errors.New("order_id is required")
+    }
+
+    _, err := db.DB.Exec(`
+        INSERT INTO order_label_details 
+            (order_id, no_of_sheets, cutting_type, labels_per_sheet, description)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (order_id) DO UPDATE
+        SET no_of_sheets = EXCLUDED.no_of_sheets,
+            cutting_type = EXCLUDED.cutting_type,
+            labels_per_sheet = EXCLUDED.labels_per_sheet,
+            description = EXCLUDED.description,
+            updated_at = NOW()
+    `, details.OrderID, details.NoOfSheets, details.CuttingType, details.LabelsPerSheet, details.Description)
+
+    return err
+}
+
+func GetOrderLabelDetails(orderID string) (*OrderLabelDetails, error) {
+    row := db.DB.QueryRow(`
+        SELECT id, order_id, no_of_sheets, cutting_type, labels_per_sheet, description FROM order_label_details
+        WHERE order_id = $1
+    `, orderID)
+
+    var details OrderLabelDetails
+    err := row.Scan(&details.ID, &details.OrderID, &details.NoOfSheets, &details.CuttingType, 
+        &details.LabelsPerSheet, &details.Description)
+    if err == sql.ErrNoRows {
+        return nil, nil
+    } else if err != nil {
+        return nil, err
+    }
+
+    return &details, nil
 }
