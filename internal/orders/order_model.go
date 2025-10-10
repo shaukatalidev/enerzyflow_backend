@@ -79,6 +79,7 @@ type AllOrderModel struct {
 	InvoiceUrl       string    `json:"invoice_url"`
 	PiUrl            string    `json:"pi_url"`
 	ExpectedDelivery time.Time `json:"expected_delivery" db:"expected_delivery_date"`
+	Deadline 		 *time.Time `json:"deadline"`
 	CreatedAt        time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at" db:"updated_at"`
 }

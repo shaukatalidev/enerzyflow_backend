@@ -271,7 +271,7 @@ func GetAllOrders(limit, offset int, role, userID string) ([]AllOrderModel, int,
 		o.created_at,
 		o.updated_at,
 		u.name AS user_name,
-		o.expected_delivery_date,
+		oa.deadline,
 		COUNT(*) OVER() AS total_count
 	FROM orders o
 	LEFT JOIN labels l ON o.label_id = l.label_id
@@ -306,7 +306,7 @@ case "plant":
 		o.created_at,
 		o.updated_at,
 		u.name AS user_name,
-		o.expected_delivery_date,
+		oa.deadline,
 		COUNT(*) OVER() AS total_count
 	FROM orders o
 	LEFT JOIN labels l ON o.label_id = l.label_id
@@ -340,7 +340,7 @@ case "plant":
 				&o.OrderID, &o.UserID, &o.CompanyName, &o.LabelID, &o.LabelURL,
 				&o.Variant, &o.Qty, &o.CapColor, &o.Volume, &o.Status,
 				&o.PaymentStatus, &o.PaymentUrl, &o.InvoiceUrl, &o.PiUrl,&o.DeclineReason,
-				&o.CreatedAt, &o.UpdatedAt, &o.UserName, &o.ExpectedDelivery, &total,
+				&o.CreatedAt, &o.UpdatedAt, &o.UserName, &o.Deadline, &total,
 			); err != nil {
 				return nil, 0, err
 			}
@@ -349,7 +349,7 @@ case "plant":
 				&o.OrderID, &o.UserID, &o.CompanyName, &o.LabelID, &o.LabelURL,
 				&o.Variant, &o.Qty, &o.CapColor, &o.Volume, &o.Status,
 				&o.DeclineReason, &o.CreatedAt, &o.UpdatedAt, &o.UserName,
-				&o.ExpectedDelivery, &total,
+				&o.Deadline, &total,
 			); err != nil {
 				return nil, 0, err
 			}
