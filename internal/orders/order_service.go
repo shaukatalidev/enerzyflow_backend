@@ -168,18 +168,27 @@ func UpdateOrderStatusService(userID, role, orderID string, req UpdateOrderStatu
 	switch role {
 	case "admin":
 		validStatuses := map[string]bool{
-			"placed":           true,
-			"printing":         true,
-			"ready_for_plant":  true,
-			"plant_processing": true,
-			"dispatched":       true,
-			"completed":        true,
-			"declined":         true,
+			"dispatched": true,
+			"completed":  true,
+			"declined":   true,
 		}
 
 		if !validStatuses[req.Status] {
 			return fmt.Errorf("invalid status '%s' for admin", req.Status)
 		}
+
+		switch order.Status {
+		case "declined":
+			return fmt.Errorf("cannot update a declined order")
+
+		case "dispatched":
+			if req.Status != "completed" {
+				return fmt.Errorf("dispatched orders can only be updated to 'completed'")
+			}
+		case "completed":
+			return fmt.Errorf("cannot update a completed order")
+		}
+		
 		if req.Status == "declined" {
 			reason := strings.TrimSpace(req.Reason)
 			reason = strings.Trim(reason, `"`)
@@ -416,15 +425,15 @@ func AddOrderCommentService(orderID, userID, role, comment string) error {
 }
 
 func GetOrderCommentsService(orderID, role, userID string) ([]OrderComment, error) {
-	if role == "admin" {	
-		return GetCommentsByOrder(orderID,userID,role)
+	if role == "admin" {
+		return GetCommentsByOrder(orderID, userID, role)
 	}
-	if isTrue, err:=  IsOrderAssignedToUser(orderID, userID, role); err != nil {
+	if isTrue, err := IsOrderAssignedToUser(orderID, userID, role); err != nil {
 		return nil, fmt.Errorf("failed to verify assignment: %v", err)
 	} else if !isTrue {
 		return nil, errors.New("you are not assigned to this order")
 	}
-	return GetCommentsByOrder(orderID,userID,role)
+	return GetCommentsByOrder(orderID, userID, role)
 }
 
 func SaveOrderLabelDetailsService(orderID string, noOfSheets int, cuttingType string, labelsPerSheet int, description string) error {
@@ -482,7 +491,7 @@ func GetOrderDetailService(orderID, role, userID string) (*OrderDetailResponse, 
 		return nil, err
 	}
 
-	comments, err := GetCommentsByOrder(orderID,userID,role)
+	comments, err := GetCommentsByOrder(orderID, userID, role)
 	if err != nil {
 		return nil, err
 	}
