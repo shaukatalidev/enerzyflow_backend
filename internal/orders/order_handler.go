@@ -351,9 +351,23 @@ func GetOrderCommentsHandler(c *gin.Context) {
 	orderID := c.Param("id")
 	role := c.GetString("role")
 
-	comments, err := GetOrderCommentsService(orderID, role)
+	userIDVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthenticated"})
+		return
+	}
+	userID := userIDVal.(uuid.UUID).String()
+
+	comments, err := GetOrderCommentsService(orderID, role, userID)
 	if err != nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		switch {
+		case strings.Contains(err.Error(), "not assigned"):
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		case strings.Contains(err.Error(), "order not found"):
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch comments", "details": err.Error()})
+		}
 		return
 	}
 
@@ -417,7 +431,7 @@ func GetOrderDetailHandler(c *gin.Context) {
 		return
 	}
 
-	role:= c.GetString("role")
+	role := c.GetString("role")
 	userIDVal, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthenticated"})

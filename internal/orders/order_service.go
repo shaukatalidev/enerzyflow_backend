@@ -346,7 +346,7 @@ func UploadPaymentScreenshotService(orderID string, fileHeader *multipart.FileHe
 	return uploadResult.SecureURL, nil
 }
 
-func UploadInvoiceService(orderID string, invoiceFile,piFile *multipart.FileHeader) (map[string]string, error) {
+func UploadInvoiceService(orderID string, invoiceFile, piFile *multipart.FileHeader) (map[string]string, error) {
 	order, err := GetOrderByID(orderID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch order: %w", err)
@@ -373,7 +373,7 @@ func UploadInvoiceService(orderID string, invoiceFile,piFile *multipart.FileHead
 	}
 
 	if err := UpdateOrderInvoice(orderID, resutl); err != nil {
-			return nil, fmt.Errorf("failed to update order: %w", err)
+		return nil, fmt.Errorf("failed to update order: %w", err)
 	}
 
 	return resutl, nil
@@ -415,34 +415,39 @@ func AddOrderCommentService(orderID, userID, role, comment string) error {
 	return AddOrderComment(orderID, userID, role, comment)
 }
 
-func GetOrderCommentsService(orderID string, role string) ([]OrderComment, error) {
-	if role != "admin" {
-		return nil, errors.New("unauthorized: only admin can view comments")
+func GetOrderCommentsService(orderID, role, userID string) ([]OrderComment, error) {
+	if role == "admin" {	
+		return GetCommentsByOrder(orderID)
+	}
+	if isTrue, err:=  IsOrderAssignedToUser(orderID, userID, role); err != nil {
+		return nil, fmt.Errorf("failed to verify assignment: %v", err)
+	} else if !isTrue {
+		return nil, errors.New("you are not assigned to this order")
 	}
 	return GetCommentsByOrder(orderID)
 }
 
 func SaveOrderLabelDetailsService(orderID string, noOfSheets int, cuttingType string, labelsPerSheet int, description string) error {
-    order, err := GetOrderByID(orderID)
-    if err != nil {
-        return err
-    }
-    if order == nil {
-        return errors.New("order not found")
-    }
+	order, err := GetOrderByID(orderID)
+	if err != nil {
+		return err
+	}
+	if order == nil {
+		return errors.New("order not found")
+	}
 
-    details := OrderLabelDetails{
-        OrderID:        orderID,
-        NoOfSheets:     noOfSheets,
-        CuttingType:    cuttingType,
-        LabelsPerSheet: labelsPerSheet,
-        Description:    description,
-    }
+	details := OrderLabelDetails{
+		OrderID:        orderID,
+		NoOfSheets:     noOfSheets,
+		CuttingType:    cuttingType,
+		LabelsPerSheet: labelsPerSheet,
+		Description:    description,
+	}
 
-    return SaveOrderLabelDetails(details)
+	return SaveOrderLabelDetails(details)
 }
 
-func GetOrderLabelDetailsService(orderID,userID,role string) (*OrderLabelDetails, error) {
+func GetOrderLabelDetailsService(orderID, userID, role string) (*OrderLabelDetails, error) {
 	switch role {
 	case "admin":
 		return GetOrderLabelDetails(orderID)
@@ -460,7 +465,7 @@ func GetOrderLabelDetailsService(orderID,userID,role string) (*OrderLabelDetails
 	default:
 		return nil, errors.New("unauthorized role")
 	}
-    
+
 }
 
 func GetOrderDetailService(orderID, role, userID string) (*OrderDetailResponse, error) {
