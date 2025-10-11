@@ -100,6 +100,7 @@ func GetOrderService(userID, orderID string) (*OrderResponse, error) {
 		DeclineReason:    order.DeclineReason,
 		PaymentUrl:       order.PaymentUrl,
 		InvoiceUrl:       order.InvoiceUrl,
+		PiUrl:            order.PiUrl,
 		ExpectedDelivery: order.ExpectedDelivery,
 		CreatedAt:        order.CreatedAt,
 		UpdatedAt:        order.UpdatedAt,
