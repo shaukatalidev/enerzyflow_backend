@@ -3,6 +3,7 @@ package orders
 import (
 	"context"
 	"enerzyflow_backend/internal/companies"
+	"enerzyflow_backend/utils"
 	"errors"
 	"fmt"
 	"mime/multipart"
@@ -38,16 +39,16 @@ func CreateOrderService(userID string, req CreateOrderRequest) (*OrderResponse, 
 
 	order := &Order{
 		OrderID:          uuid.New().String(),
-		CompanyID:        company.CompanyID,
+		UserID:           userID,
 		LabelID:          req.LabelID,
 		Variant:          req.Variant,
 		Qty:              req.Qty,
 		CapColor:         req.CapColor,
 		Volume:           req.Volume,
 		Status:           "placed",
-		ExpectedDelivery: time.Now().Add(5 * 24 * time.Hour),
-		CreatedAt:        time.Now(),
-		UpdatedAt:        time.Now(),
+		ExpectedDelivery: utils.NowInIST().Add(10 * 24 * time.Hour),
+		CreatedAt:        utils.NowInIST(),
+		UpdatedAt:        utils.NowInIST(),
 	}
 
 	if err := CreateOrder(order, userID); err != nil {
@@ -56,7 +57,7 @@ func CreateOrderService(userID string, req CreateOrderRequest) (*OrderResponse, 
 
 	return &OrderResponse{
 		OrderID:          order.OrderID,
-		CompanyID:        company.CompanyID,
+		UserID:           userID,
 		LabelURL:         label.URL,
 		Variant:          req.Variant,
 		Qty:              req.Qty,
@@ -65,8 +66,8 @@ func CreateOrderService(userID string, req CreateOrderRequest) (*OrderResponse, 
 		Status:           "placed",
 		PaymentStatus:    "payment_pending",
 		ExpectedDelivery: order.ExpectedDelivery,
-		CreatedAt:        time.Now(),
-		UpdatedAt:        time.Now(),
+		CreatedAt:        order.CreatedAt,
+		UpdatedAt:        order.UpdatedAt,
 	}, nil
 }
 
@@ -82,10 +83,13 @@ func GetOrderService(userID, orderID string) (*OrderResponse, error) {
 	if order == nil {
 		return nil, errors.New("order not found")
 	}
+	if order.UserID != userID {
+		return nil, errors.New("unauthorized access to order")
+	}
 
 	return &OrderResponse{
 		OrderID:          order.OrderID,
-		CompanyID:        order.CompanyID,
+		UserID:           order.UserID,
 		LabelURL:         order.LabelURL,
 		Variant:          order.Variant,
 		Qty:              order.Qty,
@@ -115,12 +119,7 @@ func GetOrdersService(userID string, limit, offset int) (*OrderListResponse, err
 		return nil, errors.New("company not found for user")
 	}
 
-	orders, err := GetOrdersByCompanyID(company.CompanyID, limit, offset)
-	if err != nil {
-		return nil, err
-	}
-
-	total, err := GetOrdersCountByCompanyID(company.CompanyID)
+	orders, total, err := GetOrdersByUserID(userID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +128,7 @@ func GetOrdersService(userID string, limit, offset int) (*OrderListResponse, err
 	for i, order := range orders {
 		orderResponses[i] = OrderResponse{
 			OrderID:          order.OrderID,
-			CompanyID:        order.CompanyID,
+			UserID:           userID,
 			LabelURL:         order.LabelURL,
 			Variant:          order.Variant,
 			Qty:              order.Qty,
@@ -140,6 +139,7 @@ func GetOrdersService(userID string, limit, offset int) (*OrderListResponse, err
 			DeclineReason:    order.DeclineReason,
 			PaymentUrl:       order.PaymentUrl,
 			InvoiceUrl:       order.InvoiceUrl,
+			PiUrl:            order.PiUrl,
 			ExpectedDelivery: order.ExpectedDelivery,
 			CreatedAt:        order.CreatedAt,
 			UpdatedAt:        order.UpdatedAt,
@@ -152,8 +152,8 @@ func GetOrdersService(userID string, limit, offset int) (*OrderListResponse, err
 	}, nil
 }
 
-func GetAllOrdersService(role string, limit, offset int) ([]AllOrderModel, error) {
-	return GetAllOrders(limit, offset, role)
+func GetAllOrdersService(role string, limit, offset int, userID string) ([]AllOrderModel, int, error) {
+	return GetAllOrders(limit, offset, role, userID)
 }
 
 func UpdateOrderStatusService(userID, role, orderID string, req UpdateOrderStatusRequest) error {
@@ -168,19 +168,27 @@ func UpdateOrderStatusService(userID, role, orderID string, req UpdateOrderStatu
 	switch role {
 	case "admin":
 		validStatuses := map[string]bool{
-			"placed":           true,
-			"printing":         true,
-			"ready_for_plant":  true,
-			"plant_processing": true,
-			"dispatched":       true,
-			"completed":        true,
-			"declined":         true,
+			"dispatched": true,
+			"completed":  true,
+			"declined":   true,
 		}
 
 		if !validStatuses[req.Status] {
 			return fmt.Errorf("invalid status '%s' for admin", req.Status)
 		}
-		fmt.Println("Reason", req.Reason)
+
+		switch order.Status {
+		case "declined":
+			return fmt.Errorf("cannot update a declined order")
+
+		case "dispatched":
+			if req.Status != "completed" {
+				return fmt.Errorf("dispatched orders can only be updated to 'completed'")
+			}
+		case "completed":
+			return fmt.Errorf("cannot update a completed order")
+		}
+		
 		if req.Status == "declined" {
 			reason := strings.TrimSpace(req.Reason)
 			reason = strings.Trim(reason, `"`)
@@ -205,6 +213,10 @@ func UpdateOrderStatusService(userID, role, orderID string, req UpdateOrderStatu
 		case "placed":
 			switch req.Status {
 			case "accepted":
+				if err := AssignOrder(orderID, userID, "printing", 2); err != nil {
+					return err
+				}
+
 				return UpdateOrderStatus(orderID, "printing", userID, "")
 			case "declined":
 				if req.Reason == "" {
@@ -216,8 +228,16 @@ func UpdateOrderStatusService(userID, role, orderID string, req UpdateOrderStatu
 			}
 		case "printing":
 			if req.Status == "ready_for_plant" {
-				return UpdateOrderStatus(orderID, "ready_for_plant", userID, "")
+				if err := UpdateOrderStatus(orderID, "ready_for_plant", userID, ""); err != nil {
+					return err
+				}
+
+				if err := CompleteOrderAssignment(orderID, userID); err != nil {
+					return err
+				}
+				return nil
 			}
+
 			return errors.New("invalid status update from printing")
 		default:
 			return errors.New("printing cannot handle this status")
@@ -226,8 +246,14 @@ func UpdateOrderStatusService(userID, role, orderID string, req UpdateOrderStatu
 	case "plant":
 		switch order.Status {
 		case "ready_for_plant":
+			if err := AssignOrder(orderID, userID, "plant", 3); err != nil {
+				return err
+			}
 			return UpdateOrderStatus(orderID, "plant_processing", userID, "")
 		case "plant_processing":
+			if err := CompleteOrderAssignment(orderID, userID); err != nil {
+				return err
+			}
 			return UpdateOrderStatus(orderID, "dispatched", userID, "")
 		default:
 			return errors.New("plant can only handle 'ready_for_plant' or 'plant_processing' statuses")
@@ -266,11 +292,35 @@ func UpdatePaymentStatusService(orderID, paymentStatus, reason, adminID string) 
 	}
 }
 
-func GetOrderTrackingService(orderID string) ([]OrderStatusHistory, error) {
+func GetOrderTrackingService(orderID, userID, role string) ([]OrderStatusHistory, error) {
+	order, err := GetOrderByID(orderID)
+	if err != nil {
+		return nil, err
+	}
+	if order == nil {
+		return nil, errors.New("order not found")
+	}
+	if role == "business_owner" {
+		if order.UserID != userID {
+			return nil, errors.New("unauthorized access to order")
+		}
+	}
+
 	return GetOrderStatusHistory(orderID)
 }
 
 func UploadPaymentScreenshotService(orderID string, fileHeader *multipart.FileHeader, userID string) (string, error) {
+	order, err := GetOrderByID(orderID)
+	if err != nil {
+		return "", err
+	}
+	if order == nil {
+		return "", errors.New("order not found")
+	}
+	if order.UserID != userID {
+		return "", errors.New("unauthorized")
+	}
+
 	if fileHeader == nil {
 		return "", errors.New("file cannot be nil")
 	}
@@ -305,46 +355,172 @@ func UploadPaymentScreenshotService(orderID string, fileHeader *multipart.FileHe
 	return uploadResult.SecureURL, nil
 }
 
-func UploadInvoiceService(orderID string, file *multipart.FileHeader) (string, error) {
-	if file == nil {
-		return "", errors.New("no file provided")
-	}
-
+func UploadInvoiceService(orderID string, invoiceFile, piFile *multipart.FileHeader) (map[string]string, error) {
 	order, err := GetOrderByID(orderID)
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch order: %w", err)
+		return nil, fmt.Errorf("failed to fetch order: %w", err)
 	}
 	if order == nil {
-		return "", errors.New("order not found")
+		return nil, errors.New("order not found")
 	}
 
-	cld, err := cloudinary.NewFromParams(
-		os.Getenv("CLOUDINARY_CLOUD_NAME"),
-		os.Getenv("CLOUDINARY_API_KEY"),
-		os.Getenv("CLOUDINARY_API_SECRET"),
-	)
+	resutl := map[string]string{}
+
+	if invoiceFile != nil {
+		invoiceURL, err := utils.UploadFileToCloud(invoiceFile, "invoices", "invoice_"+orderID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to upload invoice: %w", err)
+		}
+		resutl["invoice_url"] = invoiceURL
+	}
+	if piFile != nil {
+		piURL, err := utils.UploadFileToCloud(piFile, "pi", "pi_"+orderID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to upload pi: %w", err)
+		}
+		resutl["pi_url"] = piURL
+	}
+
+	if err := UpdateOrderInvoice(orderID, resutl); err != nil {
+		return nil, fmt.Errorf("failed to update order: %w", err)
+	}
+
+	return resutl, nil
+}
+
+func AddOrderCommentService(orderID, userID, role, comment string) error {
+	order, err := GetOrderByID(orderID)
 	if err != nil {
-		return "", err
+		return err
+	}
+	if order == nil {
+		return errors.New("order not found")
+	}
+	if comment == "" {
+		return errors.New("comment cannot be empty")
 	}
 
-	src, err := file.Open()
+	assigned, err := IsOrderAssignedToUser(orderID, userID, role)
 	if err != nil {
-		return "", err
+		return fmt.Errorf("failed to verify assignment: %v", err)
 	}
-	defer src.Close()
+	if !assigned {
+		return errors.New("you are not assigned to this order")
+	}
 
-	uploadResult, err := cld.Upload.Upload(context.Background(), src, uploader.UploadParams{
-		Folder:       "enerzyflow/invoices",
-		ResourceType: "raw",
-		PublicID:     "invoice_" + orderID,
-	})
+	switch role {
+	case "printing":
+		if order.Status != "printing" {
+			return errors.New("printing can only comment on orders in 'printing' status")
+		}
+	case "plant":
+		if order.Status != "plant_processing" {
+			return errors.New("plant can only comment on orders in 'plant_processing' status")
+		}
+	default:
+		return errors.New("unauthorized role")
+	}
+
+	return AddOrderComment(orderID, userID, role, comment)
+}
+
+func GetOrderCommentsService(orderID, role, userID string) ([]OrderComment, error) {
+	if role == "admin" {
+		return GetCommentsByOrder(orderID, userID, role)
+	}
+	if isTrue, err := IsOrderAssignedToUser(orderID, userID, role); err != nil {
+		return nil, fmt.Errorf("failed to verify assignment: %v", err)
+	} else if !isTrue {
+		return nil, errors.New("you are not assigned to this order")
+	}
+	return GetCommentsByOrder(orderID, userID, role)
+}
+
+func SaveOrderLabelDetailsService(orderID string, noOfSheets int, cuttingType string, labelsPerSheet int, description string) error {
+	order, err := GetOrderByID(orderID)
 	if err != nil {
-		return "", err
+		return err
+	}
+	if order == nil {
+		return errors.New("order not found")
 	}
 
-	if err := UpdateOrderInvoice(orderID, uploadResult.SecureURL); err != nil {
-		return "", err
+	details := OrderLabelDetails{
+		OrderID:        orderID,
+		NoOfSheets:     noOfSheets,
+		CuttingType:    cuttingType,
+		LabelsPerSheet: labelsPerSheet,
+		Description:    description,
 	}
 
-	return uploadResult.SecureURL, nil
+	return SaveOrderLabelDetails(details)
+}
+
+func GetOrderLabelDetailsService(orderID, userID, role string) (*OrderLabelDetails, error) {
+	switch role {
+	case "admin":
+		return GetOrderLabelDetails(orderID)
+
+	case "printing":
+		assigned, err := IsOrderAssignedToUser(orderID, userID, role)
+		if err != nil {
+			return nil, fmt.Errorf("failed to verify assignment: %v", err)
+		}
+		if !assigned {
+			return nil, errors.New("you are not assigned to this order")
+		}
+		return GetOrderLabelDetails(orderID)
+
+	default:
+		return nil, errors.New("unauthorized role")
+	}
+
+}
+
+func GetOrderDetailService(orderID, role, userID string) (*OrderDetailResponse, error) {
+	order, err := GetOrderByID(orderID)
+	if err != nil {
+		return nil, err
+	}
+	if order == nil {
+		return nil, errors.New("order not found")
+	}
+
+	assignments, err := GetOrderAssignments(orderID)
+	if err != nil {
+		return nil, err
+	}
+
+	comments, err := GetCommentsByOrder(orderID, userID, role)
+	if err != nil {
+		return nil, err
+	}
+
+	labelDetails, err := GetOrderLabelDetails(orderID)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &OrderDetailResponse{
+		OrderID:          order.OrderID,
+		UserID:           order.UserID,
+		LabelURL:         order.LabelURL,
+		Variant:          order.Variant,
+		Qty:              order.Qty,
+		CapColor:         order.CapColor,
+		Volume:           order.Volume,
+		Status:           order.Status,
+		PaymentStatus:    order.PaymentStatus,
+		PaymentUrl:       order.PaymentUrl,
+		InvoiceUrl:       order.InvoiceUrl,
+		PiUrl:            order.PiUrl,
+		DeclineReason:    order.DeclineReason,
+		CreatedAt:        order.CreatedAt,
+		UpdatedAt:        order.UpdatedAt,
+		ExpectedDelivery: order.ExpectedDelivery,
+		LabelDetails:     labelDetails,
+		Assignments:      assignments,
+		Comments:         comments,
+	}
+	return response, nil
 }

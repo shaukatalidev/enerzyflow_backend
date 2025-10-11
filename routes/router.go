@@ -39,6 +39,14 @@ func RegisterAllRoutes(r *gin.Engine) {
 		orderGroup.GET("/get-all-orders", orders.GetAllOrdersHandler)
 		orderGroup.GET("/:id/tracking", orders.GetOrderTrackingHandler)
 		orderGroup.POST("/:id/upload-invoice", utils.RoleMiddleware("admin"),orders.UploadInvoiceHandler)
+
+		orderGroup.POST("/:id/comment",orders.AddOrderCommentHandler)
+		orderGroup.GET("/:id/comment",orders.GetOrderCommentsHandler)
+
+		orderGroup.POST("/:id/label", utils.RoleMiddleware("admin"),orders.SaveOrderLabelDetailsHandler)
+		orderGroup.GET("/:id/label", orders.GetOrderLabelDetailsHandler)
+
+		orderGroup.GET("/:id/detail",utils.RoleMiddleware("admin"),orders.GetOrderDetailHandler)
 	}
 }
 

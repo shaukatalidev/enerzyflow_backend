@@ -1,23 +1,27 @@
 package orders
 
-import "time"
+import (
+	"database/sql"
+	"time"
+)
 
 type Order struct {
-	OrderID   string    `json:"order_id"`
-	CompanyID string    `json:"company_id"`
-	LabelID   string    `json:"label_id"` 
-	LabelURL   string    `json:"label_url"`
-	Variant   string    `json:"variant"`
-	Qty       int       `json:"qty"`
-	CapColor  string    `json:"cap_color"`
-	Volume    int       `json:"volume"`
-	Status    string    `json:"status"`
-	PaymentStatus string `json:"payment_status"`
-	PaymentUrl    string    `json:"payment_url"`
-	InvoiceUrl    string    `json:"invoice_url"`
+	OrderID          string    `json:"order_id"`
+	UserID           string    `json:"user_id"`
+	LabelID          string    `json:"label_id"`
+	LabelURL         string    `json:"label_url"`
+	Variant          string    `json:"variant"`
+	Qty              int       `json:"qty"`
+	CapColor         string    `json:"cap_color"`
+	Volume           int       `json:"volume"`
+	Status           string    `json:"status"`
+	PaymentStatus    string    `json:"payment_status"`
+	PaymentUrl       string    `json:"payment_url"`
+	InvoiceUrl       string    `json:"invoice_url"`
+	PiUrl			string    `json:"pi_url"`
 	ExpectedDelivery time.Time `json:"expected_delivery"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 }
 
 type CreateOrderRequest struct {
@@ -29,21 +33,22 @@ type CreateOrderRequest struct {
 }
 
 type OrderResponse struct {
-	OrderID   string    `json:"order_id"`
-	CompanyID string    `json:"company_id"`
-	LabelURL  string    `json:"label_url"`
-	Variant   string    `json:"variant"`
-	Qty       int       `json:"qty"`
-	CapColor  string    `json:"cap_color"`
-	Volume    int       `json:"volume"`
-	Status    string    `json:"status"`
-	PaymentStatus string `json:"payment_status"`
-	DeclineReason string    `json:"decline_reason"`
-	PaymentUrl    string    `json:"payment_url"`
-	InvoiceUrl    string    `json:"invoice_url"`
+	OrderID          string    `json:"order_id"`
+	UserID           string    `json:"user_id"`
+	LabelURL         string    `json:"label_url"`
+	Variant          string    `json:"variant"`
+	Qty              int       `json:"qty"`
+	CapColor         string    `json:"cap_color"`
+	Volume           int       `json:"volume"`
+	Status           string    `json:"status"`
+	PaymentStatus    string    `json:"payment_status"`
+	DeclineReason    string    `json:"decline_reason"`
+	PaymentUrl       string    `json:"payment_url"`
+	InvoiceUrl       string    `json:"invoice_url"`
+	PiUrl			string    `json:"pi_url"`
 	ExpectedDelivery time.Time `json:"expected_delivery"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 }
 
 type OrderListResponse struct {
@@ -52,29 +57,31 @@ type OrderListResponse struct {
 }
 
 type UpdateOrderStatusRequest struct {
-    Status string `json:"status"`            
-    Reason string `json:"reason,omitempty"` 
+	Status string `json:"status"`
+	Reason string `json:"reason,omitempty"`
 }
 
 type AllOrderModel struct {
-	OrderID       string    `json:"order_id" db:"order_id"`
-	CompanyID     string    `json:"company_id" db:"company_id"`
-	CompanyName   string    `json:"company_name" db:"company_name"`
-	LabelID       string    `json:"label_id" db:"label_id"`
-	LabelURL      string    `json:"label_url" db:"label_url"`
-	Variant       string    `json:"variant" db:"variant"`
-	Qty           int       `json:"qty" db:"qty"`
-	CapColor      string    `json:"cap_color" db:"cap_color"`
-	Volume        string    `json:"volume" db:"volume"`
-	Status        string    `json:"status" db:"status"`
-	PaymentStatus string `json:"payment_status"`
-	DeclineReason string    `json:"decline_reason" db:"decline_reason"`
-	PaymentUrl    string    `json:"payment_url"`
-	InvoiceUrl    string    `json:"invoice_url"`
+	OrderID          string    `json:"order_id" db:"order_id"`
+	UserID           string    `json:"user_id"`
+	UserName         string    `json:"user_name" db:"user_name"`
+	CompanyName      string    `json:"company_name" db:"company_name"`
+	LabelID          string    `json:"label_id" db:"label_id"`
+	LabelURL         string    `json:"label_url" db:"label_url"`
+	Variant          string    `json:"variant" db:"variant"`
+	Qty              int       `json:"qty" db:"qty"`
+	CapColor         string    `json:"cap_color" db:"cap_color"`
+	Volume           string    `json:"volume" db:"volume"`
+	Status           string    `json:"status,omitempty" db:"status"`
+	PaymentStatus    string    `json:"payment_status,omitempty"`
+	DeclineReason    string    `json:"decline_reason"`
+	PaymentUrl       string    `json:"payment_url,omitempty"`
+	InvoiceUrl       string    `json:"invoice_url"`
+	PiUrl            string    `json:"pi_url"`
 	ExpectedDelivery time.Time `json:"expected_delivery" db:"expected_delivery_date"`
-	CreatedAt     time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at" db:"updated_at"`
-	UserName      string    `json:"user_name" db:"user_name"`
+	Deadline 		 *time.Time `json:"deadline"`
+	CreatedAt        time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at" db:"updated_at"`
 }
 
 type OrderStatusHistory struct {
@@ -82,4 +89,61 @@ type OrderStatusHistory struct {
 	ChangedAt time.Time `json:"changed_at"`
 	ChangedBy string    `json:"changed_by,omitempty"`
 	Reason    string    `json:"reason,omitempty"`
+}
+
+type OrderComment struct {
+	ID        int       `json:"id"`
+	OrderID   string    `json:"order_id"`
+	UserID    string    `json:"user_id"`
+	Role      string    `json:"role"`
+	Comment   string    `json:"comment"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type OrderLabelDetails struct {
+    ID             int       `json:"id"`
+    OrderID        string    `json:"order_id"`
+    NoOfSheets     int       `json:"no_of_sheets"`
+    CuttingType    string    `json:"cutting_type"`
+    LabelsPerSheet int       `json:"labels_per_sheet"`
+    Description    string    `json:"description"`
+}
+
+type SaveLabelDetailsRequest struct {
+    NoOfSheets     int    `json:"no_of_sheets" binding:"required"`
+    CuttingType    string `json:"cutting_type" binding:"required"`
+    LabelsPerSheet int    `json:"labels_per_sheet" binding:"required"`
+    Description    string `json:"description"`
+}
+
+type OrderAssignment struct {
+    OrderID     string    `json:"order_id"`
+    UserID      string    `json:"user_id"`
+    Role        string    `json:"role"`
+    AssignedAt  time.Time `json:"assigned_at"`
+    Deadline    time.Time `json:"deadline"`
+    CompletedAt sql.NullTime `json:"completed_at"`
+}
+
+type OrderDetailResponse struct {
+	OrderID           string                 `json:"order_id"`
+	UserID            string                 `json:"user_id"`
+	LabelURL          string                 `json:"label_id"`
+	Variant           string                 `json:"variant"`
+	Qty               int                    `json:"qty"`
+	CapColor          string                 `json:"cap_color"`
+	Volume            int                    `json:"volume"`
+	Status            string                 `json:"status"`
+	PaymentStatus     string                 `json:"payment_status,omitempty"`
+	PaymentUrl        string                 `json:"payment_url,omitempty"`
+	InvoiceUrl        string                 `json:"invoice_url,omitempty"`
+	PiUrl             string                 `json:"pi_url,omitempty"`
+	DeclineReason     string                 `json:"decline_reason,omitempty"`
+	CreatedAt         time.Time              `json:"created_at"`
+	UpdatedAt         time.Time              `json:"updated_at"`
+	UserName          string                 `json:"user_name"`
+	ExpectedDelivery  time.Time              `json:"expected_delivery"`
+	LabelDetails      *OrderLabelDetails     `json:"label_details,omitempty"`
+	Assignments       []OrderAssignment      `json:"assignments,omitempty"`
+	Comments          []OrderComment        `json:"comments,omitempty"`
 }
