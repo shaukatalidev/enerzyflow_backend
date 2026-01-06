@@ -8,6 +8,9 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	"github.com/resendlabs/resend-go"
+
 	"github.com/sendgrid/sendgrid-go"
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
 )
@@ -85,6 +88,25 @@ func sendEmailWithSendGrid(toEmail, otp string) error {
     return nil
 }
 
+func sendEmailWithResend(toEmail, otp string) error {
+	client := resend.NewClient(os.Getenv("RESEND_API_KEY"))
+
+	params := &resend.SendEmailRequest{
+		From:    "EnerzyFlow <no-reply@enerzyflow.com>",
+		To:      []string{toEmail},
+		Subject: "Verify Your OTP",
+		Html:    fmt.Sprintf("<p>Your OTP is: <b>%s</b></p>", otp),
+		Text:    fmt.Sprintf("Your OTP is: %s", otp),
+	}
+
+	_, err := client.Emails.Send(params)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func keyForOTP(email, role string) string {
 	return email + "|" + role
 }
@@ -92,7 +114,7 @@ func keyForOTP(email, role string) string {
 
 func SendOTP(email, role string) (string, error) {
 	otp := generateEmailOTP()
-	if err := sendEmailWithSendGrid(email, otp); err != nil {
+	if err := sendEmailWithResend(email, otp); err != nil {
 		log.Printf("Failed to send email to %s: %v", email, err)
 		return "", err
 	}
