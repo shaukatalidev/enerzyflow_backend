@@ -96,3 +96,20 @@ func CreateUserByAdminHandler(c *gin.Context){
         "user":    user,
     })
 }
+
+
+func SubmitEnquiryHandler(c *gin.Context){
+    var req SubmitEnquiryRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+        return
+    }
+
+    err := SubmitEnquiryService(req)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+    
+    c.JSON(http.StatusOK, gin.H{"message": "enquiry submitted successfully"})
+}

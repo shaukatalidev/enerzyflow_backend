@@ -66,3 +66,13 @@ type CreateUserRequest struct {
     Email string `json:"email" binding:"required,email"`
     Role  string `json:"role" binding:"required,oneof=printing plant"`
 }
+
+
+// /user will submit name, phone, city, logistic supports
+type SubmitEnquiryRequest struct {
+    Name             string   `json:"name"`
+    Phone            string   `json:"phone"`
+    City             string   `json:"city"`
+    LogisticSupports string `json:"logistic_supports"`
+}
+

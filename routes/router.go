@@ -5,6 +5,7 @@ import (
 	"enerzyflow_backend/internal/orders"
 	"enerzyflow_backend/internal/users"
 	"enerzyflow_backend/utils"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -12,6 +13,11 @@ func RegisterAllRoutes(r *gin.Engine) {
 	r.GET("/", func(c *gin.Context) {
 		c.String(200, "Backend Running!")
 	})
+
+	enquiryGroup := r.Group("/enquiry")
+	{
+		enquiryGroup.POST("/submit", users.SubmitEnquiryHandler)
+	}
 
 	authGroup := r.Group("/auth")
 	{
