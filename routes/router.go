@@ -17,6 +17,7 @@ func RegisterAllRoutes(r *gin.Engine) {
 	enquiryGroup := r.Group("/enquiry")
 	{
 		enquiryGroup.POST("/submit", users.SubmitEnquiryHandler)
+		enquiryGroup.POST("/check", users.CheckEnquiryHandler)
 	}
 
 	authGroup := r.Group("/auth")

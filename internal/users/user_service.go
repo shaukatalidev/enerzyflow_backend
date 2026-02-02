@@ -252,7 +252,7 @@ func SubmitEnquiryService(req SubmitEnquiryRequest) error {
     adminEmail := "enerzyflow@gmail.com" 
 
     htmlBody := fmt.Sprintf(`
-        <h3>New Enquiry Received</h3>
+        <h3>New Franchise Enquiry Received</h3>
         <p><b>Name:</b> %s</p>
         <p><b>Phone:</b> %s</p>
         <p><b>City:</b> %s</p>
@@ -275,6 +275,36 @@ func SubmitEnquiryService(req SubmitEnquiryRequest) error {
     return sendEnquiryEmail(adminEmail, htmlBody, textBody)
 }
 
+func SubmitCheckService(req SubmitEnquiryRequest) error {
+    if req.Name == "" || req.Phone == "" || req.City == "" {
+        return errors.New("missing required enquiry fields")
+    }
+
+    adminEmail := "enerzyflow@gmail.com" 
+
+    htmlBody := fmt.Sprintf(`
+        <h3>New Territory Check Received</h3>
+        <p><b>Name:</b> %s</p>
+        <p><b>Phone:</b> %s</p>
+        <p><b>City:</b> %s</p>
+        <p><b>Logistic Supports:</b> %s</p>
+    `,
+        req.Name,
+        req.Phone,
+        req.City,
+        req.LogisticSupports,
+    )
+
+    textBody := fmt.Sprintf(
+        "New Enquiry\nName: %s\nPhone: %s\nCity: %s\nLogistic Supports: %s",
+        req.Name,
+        req.Phone,
+        req.City,
+        req.LogisticSupports,
+    )
+
+    return sendEnquiryEmail(adminEmail, htmlBody, textBody)
+}
 
 func sendEnquiryEmail(toEmail, htmlBody, textBody string) error {
     client := resend.NewClient(os.Getenv("RESEND_API_KEY"))

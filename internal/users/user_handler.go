@@ -111,5 +111,20 @@ func SubmitEnquiryHandler(c *gin.Context){
         return
     }
     
-    c.JSON(http.StatusOK, gin.H{"message": "enquiry submitted successfully"})
+    c.JSON(http.StatusOK, gin.H{"message": "Enquiry submitted successfully"})
+}
+func CheckEnquiryHandler(c *gin.Context){
+    var req SubmitEnquiryRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+        return
+    }
+
+    err := SubmitCheckService(req)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"message": "Territory check submitted successfully"})
 }
